@@ -1,6 +1,6 @@
-# 🗣️ Interactive Feedback MCP: Bridging the Gap Between AI and You!
+# 🗣️ Interactive Feedback MCP
 
-Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-loop workflow in AI-assisted development tools like [Cursor](https://www.cursor.com), [Cline](https://cline.bot) and [Windsurf](https://windsurf.com). This server allows you to easily provide feedback directly to the AI agent.
+Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-loop workflow in AI-assisted development tools like [Cursor](https://www.cursor.com), [Cline](https://cline.bot) and [Windsurf](https://windsurf.com). This server allows you to easily provide feedback directly to the AI agent, bridging the gap between AI and you.
 
  **Note:** This server is designed to run locally alongside the MCP client (e.g., Claude Desktop, VS Code), as it needs direct access to the user's operating system to display notifications.
 
@@ -9,16 +9,19 @@ Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-l
 ![Interactive Feedback Example](https://raw.githubusercontent.com/poliva/interactive-feedback-mcp/refs/heads/main/.github/example.png)
 
 ## 💡 Why Use This?
-By enabling your AI to simply ask for clarification or direction, this module dramatically reduces wasted resources on platforms like Cursor. In some cases, it helps consolidate multiple tool calls or premium requests into a single, feedback-aware request — saving resources and improving performance.
 
-## 🚀 Usage Scenarios
+In environments like Cursor, every prompt you send to the LLM is treated as a distinct request — and each one counts against your monthly limit (e.g. 500 premium requests). This becomes inefficient when you're iterating on vague instructions or correcting misunderstood output, as each follow-up clarification triggers a full new request.
 
-This server is ideal for scenarios where an LLM needs to interact directly with the user on their local machine, such as:
+This MCP server introduces a workaround: it allows the model to pause and request clarification before finalizing the response. Instead of completing the request, the model triggers a tool call (`interactive_feedback`) that opens an interactive feedback window. You can then provide more detail or ask for changes — and the model continues the session, all within a single request.
 
-- Interactive setup or configuration processes.
-- Gathering feedback during code generation or modification.
-- Clarifying instructions or confirming actions in pair programming.
-- Any workflow requiring user input or confirmation during LLM operation.
+Under the hood, it's just a clever use of tool calls to defer the completion of the request. Since tool calls don't count as separate premium interactions, you can loop through multiple feedback cycles without consuming additional requests.
+
+Essentially, this helps your AI assistant _ask for clarification instead of guessing_, without wasting another request. That means fewer wrong answers, better performance, and less wasted API usage.
+
+- **💰 Reduced Premium API Calls:** Avoid wasting expensive API calls generating code based on guesswork.
+- **✅ Fewer Errors:** Clarification \_before\_ action means less incorrect code and wasted time.
+- **⏱️ Faster Cycles:** Quick confirmations beat debugging wrong guesses.
+- **🎮 Better Collaboration:** Turns one-way instructions into a dialogue, keeping you in control.
 
 ## 🛠️ Tools
 
