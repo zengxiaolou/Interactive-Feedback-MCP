@@ -1,64 +1,23 @@
 # Interactive Feedback MCP UI
 # Developed by Fábio Ferreira (https://x.com/fabiomlferreira)
 # Inspired by/related to dotcursorrules.com (https://dotcursorrules.com/)
+# Enhanced by Pau Oliva (https://x.com/pof) with ideas from https://github.com/ttommyth/interactive-mcp
 import os
 import sys
 import json
-import psutil
 import argparse
-import subprocess
-import threading
-import hashlib
 from typing import Optional, TypedDict, List
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QCheckBox, QTextEdit, QGroupBox,
-    QRadioButton, QButtonGroup, QFrame
+    QFrame
 )
 from PySide6.QtCore import Qt, Signal, QObject, QTimer, QSettings
-from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QFont, QFontDatabase, QPalette, QColor
+from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QPalette, QColor
 
 class FeedbackResult(TypedDict):
     interactive_feedback: str
-
-class FeedbackConfig(TypedDict):
-    run_command: str
-    execute_automatically: bool
-
-def set_dark_title_bar(widget: QWidget, dark_title_bar: bool) -> None:
-    # Ensure we're on Windows
-    if sys.platform != "win32":
-        return
-
-    from ctypes import windll, c_uint32, byref
-
-    # Get Windows build number
-    build_number = sys.getwindowsversion().build
-    if build_number < 17763:  # Windows 10 1809 minimum
-        return
-
-    # Check if the widget's property already matches the setting
-    dark_prop = widget.property("DarkTitleBar")
-    if dark_prop is not None and dark_prop == dark_title_bar:
-        return
-
-    # Set the property (True if dark_title_bar != 0, False otherwise)
-    widget.setProperty("DarkTitleBar", dark_title_bar)
-
-    # Load dwmapi.dll and call DwmSetWindowAttribute
-    dwmapi = windll.dwmapi
-    hwnd = widget.winId()  # Get the window handle
-    attribute = 20 if build_number >= 18985 else 19  # Use newer attribute for newer builds
-    c_dark_title_bar = c_uint32(dark_title_bar)  # Convert to C-compatible uint32
-    dwmapi.DwmSetWindowAttribute(hwnd, attribute, byref(c_dark_title_bar), 4)
-
-    # HACK: Create a 1x1 pixel frameless window to force redraw
-    temp_widget = QWidget(None, Qt.FramelessWindowHint)
-    temp_widget.resize(1, 1)
-    temp_widget.move(widget.pos())
-    temp_widget.show()
-    temp_widget.deleteLater()  # Safe deletion in Qt event loop
 
 def get_dark_mode_palette(app: QApplication):
     darkPalette = app.palette()
@@ -85,112 +44,6 @@ def get_dark_mode_palette(app: QApplication):
     darkPalette.setColor(QPalette.PlaceholderText, QColor(127, 127, 127))
     return darkPalette
 
-def kill_tree(process: subprocess.Popen):
-    killed: list[psutil.Process] = []
-    parent = psutil.Process(process.pid)
-    for proc in parent.children(recursive=True):
-        try:
-            proc.kill()
-            killed.append(proc)
-        except psutil.Error:
-            pass
-    try:
-        parent.kill()
-    except psutil.Error:
-        pass
-    killed.append(parent)
-
-    # Terminate any remaining processes
-    for proc in killed:
-        try:
-            if proc.is_running():
-                proc.terminate()
-        except psutil.Error:
-            pass
-
-def get_user_environment() -> dict[str, str]:
-    if sys.platform != "win32":
-        return os.environ.copy()
-
-    import ctypes
-    from ctypes import wintypes
-
-    # Load required DLLs
-    advapi32 = ctypes.WinDLL("advapi32")
-    userenv = ctypes.WinDLL("userenv")
-    kernel32 = ctypes.WinDLL("kernel32")
-
-    # Constants
-    TOKEN_QUERY = 0x0008
-
-    # Function prototypes
-    OpenProcessToken = advapi32.OpenProcessToken
-    OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
-    OpenProcessToken.restype = wintypes.BOOL
-
-    CreateEnvironmentBlock = userenv.CreateEnvironmentBlock
-    CreateEnvironmentBlock.argtypes = [ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.BOOL]
-    CreateEnvironmentBlock.restype = wintypes.BOOL
-
-    DestroyEnvironmentBlock = userenv.DestroyEnvironmentBlock
-    DestroyEnvironmentBlock.argtypes = [wintypes.LPVOID]
-    DestroyEnvironmentBlock.restype = wintypes.BOOL
-
-    GetCurrentProcess = kernel32.GetCurrentProcess
-    GetCurrentProcess.argtypes = []
-    GetCurrentProcess.restype = wintypes.HANDLE
-
-    CloseHandle = kernel32.CloseHandle
-    CloseHandle.argtypes = [wintypes.HANDLE]
-    CloseHandle.restype = wintypes.BOOL
-
-    # Get process token
-    token = wintypes.HANDLE()
-    if not OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, ctypes.byref(token)):
-        raise RuntimeError("Failed to open process token")
-
-    try:
-        # Create environment block
-        environment = ctypes.c_void_p()
-        if not CreateEnvironmentBlock(ctypes.byref(environment), token, False):
-            raise RuntimeError("Failed to create environment block")
-
-        try:
-            # Convert environment block to list of strings
-            result = {}
-            env_ptr = ctypes.cast(environment, ctypes.POINTER(ctypes.c_wchar))
-            offset = 0
-
-            while True:
-                # Get string at current offset
-                current_string = ""
-                while env_ptr[offset] != "\0":
-                    current_string += env_ptr[offset]
-                    offset += 1
-
-                # Skip null terminator
-                offset += 1
-
-                # Break if we hit double null terminator
-                if not current_string:
-                    break
-
-                equal_index = current_string.index("=")
-                if equal_index == -1:
-                    continue
-
-                key = current_string[:equal_index]
-                value = current_string[equal_index + 1:]
-                result[key] = value
-
-            return result
-
-        finally:
-            DestroyEnvironmentBlock(environment)
-
-    finally:
-        CloseHandle(token)
-
 class FeedbackTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -205,9 +58,6 @@ class FeedbackTextEdit(QTextEdit):
                 parent._submit_feedback()
         else:
             super().keyPressEvent(event)
-
-class LogSignals(QObject):
-    append_log = Signal(str)
 
 class FeedbackUI(QMainWindow):
     def __init__(self, prompt: str, predefined_options: Optional[List[str]] = None):
@@ -242,8 +92,6 @@ class FeedbackUI(QMainWindow):
         self.settings.endGroup() # End "MainWindow_General" group
 
         self._create_ui()
-
-        set_dark_title_bar(self, True)
 
     def _create_ui(self):
         central_widget = QWidget()
@@ -288,7 +136,7 @@ class FeedbackUI(QMainWindow):
         self.feedback_text.setMinimumHeight(5 * row_height + padding)
 
         self.feedback_text.setPlaceholderText("Enter your feedback here (Ctrl+Enter to submit)")
-        submit_button = QPushButton("&Send Feedback (Ctrl+Enter)")
+        submit_button = QPushButton("&Send Feedback")
         submit_button.clicked.connect(self._submit_feedback)
 
         feedback_layout.addWidget(self.feedback_text)

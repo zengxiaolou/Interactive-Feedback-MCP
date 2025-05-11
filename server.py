@@ -1,6 +1,7 @@
 # Interactive Feedback MCP
 # Developed by Fábio Ferreira (https://x.com/fabiomlferreira)
 # Inspired by/related to dotcursorrules.com (https://dotcursorrules.com/)
+# Enhanced by Pau Oliva (https://x.com/pof) with ideas from https://github.com/ttommyth/interactive-mcp
 import os
 import sys
 import json
@@ -58,13 +59,10 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
             os.unlink(output_file)
         raise e
 
-def first_line(text: str) -> str:
-    return text.split("\n")[0].strip()
-
 @mcp.tool()
 def interactive_feedback(
-    message: str,
-    predefined_options: list = None,
+    message: str = Field(description="The specific question for the user"),
+    predefined_options: list = Field(default=None, description="Predefined options for the user to choose from (optional)"),
 ) -> Dict[str, str]:
     """Request interactive feedback from the user"""
     predefined_options_list = predefined_options if isinstance(predefined_options, list) else None
