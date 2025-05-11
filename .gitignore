@@ -15,5 +15,6 @@ venv*/
 
 #Others
 .DS_Store
+uv.lock
 
 .cursor/rules/

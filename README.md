@@ -1,14 +1,12 @@
 # 🗣️ Interactive Feedback MCP: Bridging the Gap Between AI and You!
 
-Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-loop workflow in AI-assisted development tools like [Cursor](https://www.cursor.com), [Cline](https://cline.bot) and [Windsurf](https://windsurf.com).
-
-This server allows you to easily provide feedback directly to the AI agent.
+Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-loop workflow in AI-assisted development tools like [Cursor](https://www.cursor.com), [Cline](https://cline.bot) and [Windsurf](https://windsurf.com). This server allows you to easily provide feedback directly to the AI agent.
 
  **Note:** This server is designed to run locally alongside the MCP client (e.g., Claude Desktop, VS Code), as it needs direct access to the user's operating system to display notifications.
 
 ## 🖼️ Example
 
-![Interactive Feedback Example](.github/example.png)
+![Interactive Feedback Example](https://raw.githubusercontent.com/poliva/interactive-feedback-mcp/refs/heads/main/.github/example.png)
 
 ## 💡 Why Use This?
 By enabling your AI to simply ask for clarification or direction, this module dramatically reduces wasted resources on platforms like Cursor. In some cases, it helps consolidate multiple tool calls or premium requests into a single, feedback-aware request — saving resources and improving performance.
@@ -67,6 +65,7 @@ This server exposes the following tool via the Model Context Protocol (MCP):
 2. Add the following to the custom rules in your AI assistant (in Cursor Settings > Rules > User Rules):
 
 > If requirements or instructions are unclear use the tool interactive_feedback to ask clarifying questions to the user before proceeding, do not make assumptions. Whenever possible, present the user with predefined options through the interactive_feedback MCP tool to facilitate quick decisions.
+
 > Whenever you're about to complete a user request, call the interactive_feedback tool to request user feedback before ending the process. If the feedback is empty you can end the request and don't call the tool in loop.
 
 This will ensure your AI assistant always uses this MCP server to request user feedback when the prompt is unclear and before marking the task as completed.
