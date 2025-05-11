@@ -15,7 +15,7 @@ from pydantic import Field
 # The log_level is necessary for Cline to work: https://github.com/jlowin/fastmcp/issues/81
 mcp = FastMCP("Interactive Feedback MCP", log_level="ERROR")
 
-def launch_feedback_ui(project_directory: str, summary: str) -> dict[str, str]:
+def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None) -> dict[str, str]:
     # Create a temporary file for the feedback result
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         output_file = tmp.name
@@ -32,9 +32,9 @@ def launch_feedback_ui(project_directory: str, summary: str) -> dict[str, str]:
             sys.executable,
             "-u",
             feedback_ui_path,
-            "--project-directory", project_directory,
             "--prompt", summary,
-            "--output-file", output_file
+            "--output-file", output_file,
+            "--predefined-options", "|||".join(predefinedOptions) if predefinedOptions else ""
         ]
         result = subprocess.run(
             args,
@@ -63,11 +63,12 @@ def first_line(text: str) -> str:
 
 @mcp.tool()
 def interactive_feedback(
-    project_directory: Annotated[str, Field(description="Full path to the project directory")],
-    summary: Annotated[str, Field(description="Short, one-line summary of the changes")],
+    message: str,
+    predefined_options: list = None,
 ) -> Dict[str, str]:
-    """Request interactive feedback for a given project directory and summary"""
-    return launch_feedback_ui(first_line(project_directory), first_line(summary))
+    """Request interactive feedback from the user"""
+    predefined_options_list = predefined_options if isinstance(predefined_options, list) else None
+    return launch_feedback_ui(message, predefined_options_list)
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
