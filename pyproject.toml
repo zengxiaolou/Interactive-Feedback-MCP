@@ -1,9 +1,9 @@
 [project]
-name = "interactive-feedback"
-version = "0.1.1"
+name = "interactive-feedback-mcp"
+version = "0.1.2"
 description = "MCP server for interactive user feedback and command execution in AI-assisted development, by Fábio Ferreira and Pau Oliva."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=2.0.0",
     "psutil>=7.0.0",

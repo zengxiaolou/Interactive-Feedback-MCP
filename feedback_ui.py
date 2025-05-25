@@ -67,7 +67,7 @@ class FeedbackUI(QMainWindow):
 
         self.feedback_result = None
         
-        self.setWindowTitle("Interactive Feedback MCP")
+        self.setWindowTitle("交互式反馈 MCP")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         icon_path = os.path.join(script_dir, "images", "feedback.png")
         self.setWindowIcon(QIcon(icon_path))
@@ -97,56 +97,111 @@ class FeedbackUI(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
-
-        # Feedback section
-        self.feedback_group = QGroupBox("Feedback")
-        feedback_layout = QVBoxLayout(self.feedback_group)
+        layout.setContentsMargins(20,20,20,20)
 
         # Description label (from self.prompt) - Support multiline
         self.description_label = QLabel(self.prompt)
         self.description_label.setWordWrap(True)
-        feedback_layout.addWidget(self.description_label)
+        # Increase font size for description label
+        font = self.description_label.font()
+        font.setPointSize(font.pointSize() + 4) # Increase font size by 3 points
+        self.description_label.setFont(font)
+        layout.addWidget(self.description_label)
 
         # Add predefined options if any
         self.option_checkboxes = []
         if self.predefined_options and len(self.predefined_options) > 0:
             options_frame = QFrame()
             options_layout = QVBoxLayout(options_frame)
-            options_layout.setContentsMargins(0, 10, 0, 10)
+            options_layout.setContentsMargins(0,10,0,10)
             
             for option in self.predefined_options:
                 checkbox = QCheckBox(option)
+                # Increase font size for checkboxes
+                font = checkbox.font()
+                font.setPointSize(font.pointSize() + 4)
+                checkbox.setFont(font)
                 self.option_checkboxes.append(checkbox)
                 options_layout.addWidget(checkbox)
             
-            feedback_layout.addWidget(options_frame)
+            layout.addWidget(options_frame)
             
-            # Add a separator
-            separator = QFrame()
-            separator.setFrameShape(QFrame.HLine)
-            separator.setFrameShadow(QFrame.Sunken)
-            feedback_layout.addWidget(separator)
+
 
         # Free-form text feedback
         self.feedback_text = FeedbackTextEdit()
+        # Increase font size and apply modern border to text edit
+        font = self.feedback_text.font()
+        font.setPointSize(font.pointSize() + 4)
+        self.feedback_text.setFont(font)
+        self.feedback_text.setStyleSheet(
+            "QTextEdit {"
+
+            "  border-radius: 15px;"
+            "  padding: 10px;margin:0 0 10px ;"
+            "}"
+        )
         font_metrics = self.feedback_text.fontMetrics()
         row_height = font_metrics.height()
         # Calculate height for 5 lines + some padding for margins
         padding = self.feedback_text.contentsMargins().top() + self.feedback_text.contentsMargins().bottom() + 5 # 5 is extra vertical padding
         self.feedback_text.setMinimumHeight(5 * row_height + padding)
 
-        self.feedback_text.setPlaceholderText("Enter your feedback here (Ctrl+Enter to submit)")
-        submit_button = QPushButton("&Send Feedback")
+        self.feedback_text.setPlaceholderText("在此输入您的下一步要求或反馈 (Ctrl+Enter 提交)")
+        
+        # Create a horizontal layout for buttons
+        button_layout = QHBoxLayout()
+
+        # Create the submit button
+        submit_button = QPushButton("&提交")
         submit_button.clicked.connect(self._submit_feedback)
 
-        feedback_layout.addWidget(self.feedback_text)
-        feedback_layout.addWidget(submit_button)
+        # Create the cancel button
+        cancel_button = QPushButton("&取消")
+        cancel_button.clicked.connect(self.close) # Connect cancel button to close the window
 
-        # Set minimum height for feedback_group
-        self.feedback_group.setMinimumHeight(self.description_label.sizeHint().height() + self.feedback_text.minimumHeight() + submit_button.sizeHint().height() + feedback_layout.spacing() * 2 + feedback_layout.contentsMargins().top() + feedback_layout.contentsMargins().bottom() + 10)
+        # Add buttons to the horizontal layout
+        button_layout.addWidget(cancel_button) # Put cancel on the left
+        button_layout.addWidget(submit_button) # Put submit on the right
 
-        # Add widgets
-        layout.addWidget(self.feedback_group)
+        # Apply modern style and increase size for the submit button
+        submit_button.setStyleSheet(
+            "QPushButton {"
+            "  padding: 10px 20px;"
+            "  font-size: 14px;"
+            "  border-radius: 5px;"
+            "  background-color: #2196F3; /* Blue */"
+            "  color: white;"
+            "  border: none;"
+            "}"
+            "QPushButton:hover {"
+            "  background-color: #1976D2;"
+            "}"
+            "QPushButton:pressed {"
+            "  background-color: #1565C0;"
+            "}"
+        )
+        
+        # Apply modern style and increase size for the cancel button
+        cancel_button.setStyleSheet(
+            "QPushButton {"
+            "  padding: 10px 20px;"
+            "  font-size: 14px;"
+            "  border-radius: 5px;"
+            "  background-color: #9E9E9E; /* Grey */"
+            "  color: white;"
+            "  border: none;"
+            "}"
+            "QPushButton:hover {"
+            "  background-color: #757575;"
+            "}"
+            "QPushButton:pressed {"
+            "  background-color: #616161;"
+            "}"
+        )
+
+        layout.addWidget(self.feedback_text)
+        layout.addLayout(button_layout)
 
     def _submit_feedback(self):
         feedback_text = self.feedback_text.toPlainText().strip()
@@ -213,15 +268,15 @@ def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, out
     return result
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the feedback UI")
-    parser.add_argument("--prompt", default="I implemented the changes you requested.", help="The prompt to show to the user")
-    parser.add_argument("--predefined-options", default="", help="Pipe-separated list of predefined options (|||)")
-    parser.add_argument("--output-file", help="Path to save the feedback result as JSON")
+    parser = argparse.ArgumentParser(description="运行反馈 UI")
+    parser.add_argument("--prompt", default="我已经根据您的请求完成了修改。", help="要向用户显示的提示信息")
+    parser.add_argument("--predefined-options", default="", help="竖线分隔的预设选项列表 (|||)")
+    parser.add_argument("--output-file", help="保存反馈结果的 JSON 文件路径")
     args = parser.parse_args()
 
     predefined_options = [opt for opt in args.predefined_options.split("|||") if opt] if args.predefined_options else None
     
     result = feedback_ui(args.prompt, predefined_options, args.output_file)
     if result:
-        print(f"\nFeedback received:\n{result['interactive_feedback']}")
+        print(f"\n收到的反馈:\n{result['interactive_feedback']}")
     sys.exit(0)
