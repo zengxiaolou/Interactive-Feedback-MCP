@@ -49,15 +49,20 @@ def get_dark_mode_palette(app: QApplication):
     return darkPalette
 
 class FeedbackTextEdit(QTextEdit):
+    # 图片处理常量
+    DEFAULT_MAX_IMAGE_WIDTH = 1624
+    DEFAULT_MAX_IMAGE_HEIGHT = 1624
+    DEFAULT_IMAGE_FORMAT = "PNG"
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.image_data = []   # 保存图片的Base64数据列表
         # 获取设备的像素比例
         self.device_pixel_ratio = QApplication.primaryScreen().devicePixelRatio()
         # 图片压缩参数
-        self.max_image_width = 1024  # 最大宽度
-        self.max_image_height = 1024  # 最大高度
-        self.image_quality = 80  # JPEG质量
+        self.max_image_width = self.DEFAULT_MAX_IMAGE_WIDTH  # 最大宽度
+        self.max_image_height = self.DEFAULT_MAX_IMAGE_HEIGHT  # 最大高度
+        self.image_format = self.DEFAULT_IMAGE_FORMAT  # 图片格式
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Return and event.modifiers() == Qt.ControlModifier:
@@ -70,56 +75,32 @@ class FeedbackTextEdit(QTextEdit):
         else:
             super().keyPressEvent(event)
 
-    def _compress_image(self, image):
-        """压缩图片，限制最大尺寸并适应屏幕像素比"""
-        from PySide6.QtGui import QImage
-
-        # 获取原始尺寸
-        original_width = image.width()
-        original_height = image.height()
-
-        # 计算新尺寸，保持纵横比
-        if original_width > self.max_image_width or original_height > self.max_image_height:
-            scale_ratio = min(self.max_image_width/original_width, self.max_image_height/original_height)
-            new_width = int(original_width * scale_ratio)
-            new_height = int(original_height * scale_ratio)
-
-            # 缩放图片
-            scaled_image = image.scaled(new_width, new_height,
-                                        Qt.KeepAspectRatio,
-                                        Qt.SmoothTransformation)
-            return scaled_image
-        return image
-
     def _convert_image_to_base64(self, image):
-        """将图片转换为 Base64 编码字符串，使用压缩"""
+        """将图片转换为 Base64 编码字符串"""
         try:
-            from PySide6.QtCore import QBuffer, QIODevice
-            from PySide6.QtGui import QPixmap
-
-            # 首先压缩图片
-            compressed_image = self._compress_image(image)
-
             # 将图片转换为QPixmap
-            if not isinstance(compressed_image, QPixmap):
-                pixmap = QPixmap.fromImage(compressed_image)
+            if not isinstance(image, QPixmap):
+                pixmap = QPixmap.fromImage(image)
             else:
-                pixmap = compressed_image
+                pixmap = image
 
             # 创建字节缓冲区
             buffer = QBuffer()
             buffer.open(QIODevice.WriteOnly)
 
-            # 将pixmap保存到缓冲区为JPEG格式，降低质量以减小体积
-            # JPEG格式对于照片类型的图像通常比PNG小得多
-            pixmap.save(buffer, "JPEG", self.image_quality)
+            pixmap.save(buffer, self.image_format)
+            file_extension = self.image_format.lower()  # 使用小写的格式名作为扩展名
 
             # 获取字节数据并转换为base64
             byte_array = buffer.data()
             base64_string = base64.b64encode(byte_array).decode('utf-8')
             buffer.close()
 
-            return base64_string
+            # 返回Base64数据和文件扩展名
+            return {
+                'data': base64_string,
+                'extension': file_extension
+            }
         except Exception as e:
             print(f"转换图片为Base64时出错: {e}")
             return None
@@ -130,84 +111,107 @@ class FeedbackTextEdit(QTextEdit):
         Handle pasting from mime data, explicitly checking for image data.
         支持视网膜屏幕(Retina Display)的高DPI显示
         """
-        if source_data.hasImage():
-            # If the mime data contains an image, convert to Base64
-            image = source_data.imageData()
-            if image:
-                # 转换图片为Base64编码（包含压缩）
-                base64_data = self._convert_image_to_base64(image)
+        try:
+            if source_data.hasImage():
+                # If the mime data contains an image, convert to Base64
+                image = source_data.imageData()
+                if image:
+                    try:
+                        # 使用原始图片，不进行压缩
+                        # 转换图片为Base64编码
+                        image_result = self._convert_image_to_base64(image)
 
-                if base64_data:
-                    # 生成唯一的文件名用于标识
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    unique_id = str(uuid.uuid4())[:8]
-                    filename = f"pasted_image_{timestamp}_{unique_id}.jpg"  # 使用jpg扩展名
+                        if image_result:
+                            # 生成唯一的文件名用于标识
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            unique_id = str(uuid.uuid4())[:8]
+                            filename = f"pasted_image_{timestamp}_{unique_id}.{image_result['extension']}"
 
-                    # 保存Base64数据
-                    image_info = {
-                        'base64': base64_data,
-                        'filename': filename
-                    }
-                    self.image_data.append(image_info)
+                            # 保存Base64数据
+                            image_info = {
+                                'base64': image_result['data'],
+                                'filename': filename
+                            }
+                            self.image_data.append(image_info)
 
-                    # 压缩图片用于显示
-                    compressed_image = self._compress_image(image)
+                            # 生成一个唯一URL用于在界面中显示
+                            timestamp_ms = QDateTime.currentMSecsSinceEpoch()
+                            image_url = QUrl(f"image://pasted_image_{timestamp_ms}")
 
-                    # 生成一个唯一URL用于在界面中显示
-                    timestamp_ms = QDateTime.currentMSecsSinceEpoch()
-                    image_url = QUrl(f"image://pasted_image_{timestamp_ms}")
+                            try:
+                                # 处理视网膜屏幕：根据设备像素比调整图像
+                                if self.device_pixel_ratio > 1.0:
+                                    # 对于视网膜屏幕，创建更高分辨率的图像
+                                    high_res_image = image
 
-                    # 处理视网膜屏幕：根据设备像素比调整图像
-                    if self.device_pixel_ratio > 1.0:
-                        # 对于视网膜屏幕，创建更高分辨率的图像
-                        high_res_image = compressed_image
+                                    # 获取原始尺寸
+                                    original_width = high_res_image.width()
+                                    original_height = high_res_image.height()
 
-                        # 获取原始尺寸
-                        original_width = high_res_image.width()
-                        original_height = high_res_image.height()
+                                    # 计算逻辑尺寸（显示尺寸）
+                                    logical_width = original_width / self.device_pixel_ratio
+                                    logical_height = original_height / self.device_pixel_ratio
 
-                        # 计算逻辑尺寸（显示尺寸）
-                        logical_width = original_width / self.device_pixel_ratio
-                        logical_height = original_height / self.device_pixel_ratio
+                                    # 将图片添加到文档资源中以便显示
+                                    self.document().addResource(QTextDocument.ImageResource, image_url, high_res_image)
 
-                        # 将图片添加到文档资源中以便显示
-                        self.document().addResource(QTextDocument.ImageResource, image_url, high_res_image)
+                                    # 在光标位置插入图片，但设置逻辑尺寸
+                                    cursor = self.textCursor()
+                                    image_format = QTextImageFormat()
+                                    image_format.setName(image_url.toString())
+                                    image_format.setWidth(logical_width)
+                                    image_format.setHeight(logical_height)
+                                    cursor.insertImage(image_format)
+                                else:
+                                    # 非视网膜屏幕，正常处理
+                                    self.document().addResource(QTextDocument.ImageResource, image_url, image)
 
-                        # 在光标位置插入图片，但设置逻辑尺寸
+                                    # 在光标位置插入图片
+                                    cursor = self.textCursor()
+                                    image_format = QTextImageFormat()
+                                    image_format.setName(image_url.toString())
+                                    cursor.insertImage(image_format)
+                            except Exception as e:
+                                print(f"处理图片显示时出错: {e}")
+                                cursor = self.textCursor()
+                                cursor.insertText(f"[图片显示失败: {str(e)}]")
+                        else:
+                            # 如果转换失败，插入错误信息
+                            cursor = self.textCursor()
+                            cursor.insertText("[图片处理失败: 转换为Base64失败]")
+                    except Exception as e:
+                        print(f"处理图片时出错: {e}")
                         cursor = self.textCursor()
-                        image_format = QTextImageFormat()
-                        image_format.setName(image_url.toString())
-                        image_format.setWidth(logical_width)
-                        image_format.setHeight(logical_height)
-                        cursor.insertImage(image_format)
-                    else:
-                        # 非视网膜屏幕，正常处理
-                        self.document().addResource(QTextDocument.ImageResource, image_url, compressed_image)
-
-                        # 在光标位置插入图片
-                        cursor = self.textCursor()
-                        image_format = QTextImageFormat()
-                        image_format.setName(image_url.toString())
-                        cursor.insertImage(image_format)
+                        cursor.insertText(f"[图片处理失败: {str(e)}]")
                 else:
-                    # 如果转换失败，插入错误信息
                     cursor = self.textCursor()
-                    cursor.insertText("[图片处理失败]")
-        elif source_data.hasHtml():
-            # If the mime data contains HTML, insert it as HTML
-            super().insertFromMimeData(source_data)
-        elif source_data.hasText():
-            # If the mime data contains plain text, insert it as plain text
-            super().insertFromMimeData(source_data)
-        else:
-            # For other types, call the base class method
-            super().insertFromMimeData(source_data)
+                    cursor.insertText("[图片处理失败: 无效的图片数据]")
+            elif source_data.hasHtml():
+                # If the mime data contains HTML, insert it as HTML
+                super().insertFromMimeData(source_data)
+            elif source_data.hasText():
+                # If the mime data contains plain text, insert it as plain text
+                super().insertFromMimeData(source_data)
+            else:
+                # For other types, call the base class method
+                super().insertFromMimeData(source_data)
+        except Exception as e:
+            print(f"处理粘贴内容时出错: {e}")
+            # 尝试使用基类方法处理
+            try:
+                super().insertFromMimeData(source_data)
+            except:
+                cursor = self.textCursor()
+                cursor.insertText(f"[粘贴内容失败: {str(e)}]")
 
     def get_image_data(self):
         """返回图片数据列表（包含Base64编码）"""
         return self.image_data.copy()
 
 class FeedbackUI(QMainWindow):
+    # 缓存Markdown实例
+    _markdown_instance = None
+
     def __init__(self, prompt: str, predefined_options: Optional[List[str]] = None):
         super().__init__()
         self.prompt = prompt
@@ -232,8 +236,11 @@ class FeedbackUI(QMainWindow):
         window_height = int(screen_height * 0.6)  # 屏幕高度的60%
         window_width = 800
 
-        # 固定窗口大小，不允许调整
-        self.setFixedSize(window_width, window_height)
+        # 设置窗口的初始大小，但允许用户调整
+        self.resize(window_width, window_height)
+
+        # 设置最小窗口尺寸，防止UI元素挤在一起
+        self.setMinimumSize(600, 400)
 
         # 窗口居中显示
         x = (screen.width() - window_width) // 2
@@ -253,11 +260,15 @@ class FeedbackUI(QMainWindow):
             # 配置markdown扩展
             extensions = ['extra', 'codehilite', 'toc']
 
-            # 创建markdown实例
-            md = markdown.Markdown(extensions=extensions)
+            # 使用缓存的Markdown实例或创建新实例
+            if FeedbackUI._markdown_instance is None:
+                FeedbackUI._markdown_instance = markdown.Markdown(extensions=extensions)
+
+            # 重置实例以确保状态清空
+            FeedbackUI._markdown_instance.reset()
 
             # 转换markdown到HTML
-            html = md.convert(markdown_text)
+            html = FeedbackUI._markdown_instance.convert(markdown_text)
 
             # 应用自定义样式
             styled_html = f"""
@@ -385,8 +396,6 @@ class FeedbackUI(QMainWindow):
 
             layout.addWidget(options_frame)
 
-
-
         # Free-form text feedback
         self.feedback_text = FeedbackTextEdit()
         # Increase font size and apply modern border to text edit
@@ -511,7 +520,6 @@ class FeedbackUI(QMainWindow):
         # Add user's text feedback
         if feedback_text:
             final_feedback_parts.append(feedback_text)
-
 
         # Join with a newline if both parts exist
         final_feedback = "\n\n".join(final_feedback_parts)
