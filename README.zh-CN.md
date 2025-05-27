@@ -12,7 +12,7 @@
 
 ## 🖼️ 示例
 
-![交互式反馈示例](https://raw.githubusercontent.com/poliva/interactive-feedback-mcp/refs/heads/main/.github/example.png)
+![交互式反馈示例](./demo.png)
 
 ## 💡 为什么使用这个？
 

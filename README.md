@@ -12,7 +12,7 @@ Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-l
 
 ## 🖼️ Example
 
-![Interactive Feedback Example](https://raw.githubusercontent.com/poliva/interactive-feedback-mcp/refs/heads/main/.github/example.png)
+![Interactive Feedback Example](./demo.png)
 
 ## 💡 Why Use This?
 
