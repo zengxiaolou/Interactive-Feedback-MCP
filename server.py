@@ -7,10 +7,10 @@ import sys
 import json
 import tempfile
 import subprocess
+import base64
+from typing import Annotated, Dict, Tuple, List
 
-from typing import Annotated, Dict
-
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Image
 from pydantic import Field
 
 # The log_level is necessary for Cline to work: https://github.com/jlowin/fastmcp/issues/81
@@ -63,10 +63,40 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
 def interactive_feedback(
     message: str = Field(description="The specific question for the user"),
     predefined_options: list = Field(default=None, description="Predefined options for the user to choose from (optional)"),
-) -> Dict[str, str]:
-    """Request interactive feedback from the user"""
+) -> Tuple[str | Image, ...]:
+    """
+    Request interactive feedback from the user.
+
+    返回策略：
+      • 只返回文字 → (str,)
+      • 只返回 1 张图 → (Image,)
+      • 文字 + N 张图 → (str, Image, Image, …)
+    """
     predefined_options_list = predefined_options if isinstance(predefined_options, list) else None
-    return launch_feedback_ui(message, predefined_options_list)
+    result_dict = launch_feedback_ui(message, predefined_options_list)
+
+    txt: str = result_dict.get("interactive_feedback", "").strip()
+    img_b64_list: List[str] = result_dict.get("images", [])
+
+    # 把 base64 变成 Image 对象
+    images: List[Image] = []
+    for b64 in img_b64_list:
+        try:
+            img_bytes = base64.b64decode(b64)
+            images.append(Image(data=img_bytes, format="png"))
+        except Exception:
+            # 若解码失败，忽略该图片并在文字中提示
+            txt += f"\n\n[warning] 有一张图片解码失败。"
+
+    # 根据返回的实际内容组装 tuple
+    if txt and images:
+        return (txt, *images)
+    elif txt:
+        return (txt,)
+    elif images:
+        return (images[0],) if len(images) == 1 else tuple(images)
+    else:
+        return ("",)
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

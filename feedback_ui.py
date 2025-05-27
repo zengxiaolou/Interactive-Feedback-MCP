@@ -21,6 +21,7 @@ from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QPalette, QColor, QText
 
 class FeedbackResult(TypedDict):
     interactive_feedback: str
+    images: List[str]
 
 def get_dark_mode_palette(app: QApplication):
     darkPalette = app.palette()
@@ -51,6 +52,12 @@ class FeedbackTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.image_data = []   # 保存图片的Base64数据列表
+        # 获取设备的像素比例
+        self.device_pixel_ratio = QApplication.primaryScreen().devicePixelRatio()
+        # 图片压缩参数
+        self.max_image_width = 1024  # 最大宽度
+        self.max_image_height = 1024  # 最大高度
+        self.image_quality = 80  # JPEG质量
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key_Return and event.modifiers() == Qt.ControlModifier:
@@ -63,26 +70,49 @@ class FeedbackTextEdit(QTextEdit):
         else:
             super().keyPressEvent(event)
 
+    def _compress_image(self, image):
+        """压缩图片，限制最大尺寸并适应屏幕像素比"""
+        from PySide6.QtGui import QImage
 
+        # 获取原始尺寸
+        original_width = image.width()
+        original_height = image.height()
+
+        # 计算新尺寸，保持纵横比
+        if original_width > self.max_image_width or original_height > self.max_image_height:
+            scale_ratio = min(self.max_image_width/original_width, self.max_image_height/original_height)
+            new_width = int(original_width * scale_ratio)
+            new_height = int(original_height * scale_ratio)
+
+            # 缩放图片
+            scaled_image = image.scaled(new_width, new_height,
+                                        Qt.KeepAspectRatio,
+                                        Qt.SmoothTransformation)
+            return scaled_image
+        return image
 
     def _convert_image_to_base64(self, image):
-        """将图片转换为 Base64 编码字符串"""
+        """将图片转换为 Base64 编码字符串，使用压缩"""
         try:
             from PySide6.QtCore import QBuffer, QIODevice
             from PySide6.QtGui import QPixmap
 
-            # 将图片转换为QPixmap（如果不是的话）
-            if not isinstance(image, QPixmap):
-                pixmap = QPixmap.fromImage(image)
+            # 首先压缩图片
+            compressed_image = self._compress_image(image)
+
+            # 将图片转换为QPixmap
+            if not isinstance(compressed_image, QPixmap):
+                pixmap = QPixmap.fromImage(compressed_image)
             else:
-                pixmap = image
+                pixmap = compressed_image
 
             # 创建字节缓冲区
             buffer = QBuffer()
             buffer.open(QIODevice.WriteOnly)
 
-            # 将pixmap保存到缓冲区为PNG格式
-            pixmap.save(buffer, "PNG")
+            # 将pixmap保存到缓冲区为JPEG格式，降低质量以减小体积
+            # JPEG格式对于照片类型的图像通常比PNG小得多
+            pixmap.save(buffer, "JPEG", self.image_quality)
 
             # 获取字节数据并转换为base64
             byte_array = buffer.data()
@@ -98,19 +128,20 @@ class FeedbackTextEdit(QTextEdit):
     def insertFromMimeData(self, source_data):
         """
         Handle pasting from mime data, explicitly checking for image data.
+        支持视网膜屏幕(Retina Display)的高DPI显示
         """
         if source_data.hasImage():
             # If the mime data contains an image, convert to Base64
             image = source_data.imageData()
             if image:
-                # 转换图片为Base64编码
+                # 转换图片为Base64编码（包含压缩）
                 base64_data = self._convert_image_to_base64(image)
 
                 if base64_data:
                     # 生成唯一的文件名用于标识
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     unique_id = str(uuid.uuid4())[:8]
-                    filename = f"pasted_image_{timestamp}_{unique_id}.png"
+                    filename = f"pasted_image_{timestamp}_{unique_id}.jpg"  # 使用jpg扩展名
 
                     # 保存Base64数据
                     image_info = {
@@ -119,22 +150,45 @@ class FeedbackTextEdit(QTextEdit):
                     }
                     self.image_data.append(image_info)
 
+                    # 压缩图片用于显示
+                    compressed_image = self._compress_image(image)
+
                     # 生成一个唯一URL用于在界面中显示
                     timestamp_ms = QDateTime.currentMSecsSinceEpoch()
                     image_url = QUrl(f"image://pasted_image_{timestamp_ms}")
 
-                    # 将图片添加到文档资源中以便显示
-                    self.document().addResource(QTextDocument.ImageResource, image_url, image)
+                    # 处理视网膜屏幕：根据设备像素比调整图像
+                    if self.device_pixel_ratio > 1.0:
+                        # 对于视网膜屏幕，创建更高分辨率的图像
+                        high_res_image = compressed_image
 
-                    # 在光标位置插入图片
-                    cursor = self.textCursor()
-                    image_format = QTextImageFormat()
-                    # image_format.setToolTip(f"图片已添加: {filename}")
-                    image_format.setName(image_url.toString())
-                    cursor.insertImage(image_format)
+                        # 获取原始尺寸
+                        original_width = high_res_image.width()
+                        original_height = high_res_image.height()
 
-                    # 在图片后添加一个换行和简要信息
-                    # cursor.insertText(f"\n[图片已添加: {filename}]\n")
+                        # 计算逻辑尺寸（显示尺寸）
+                        logical_width = original_width / self.device_pixel_ratio
+                        logical_height = original_height / self.device_pixel_ratio
+
+                        # 将图片添加到文档资源中以便显示
+                        self.document().addResource(QTextDocument.ImageResource, image_url, high_res_image)
+
+                        # 在光标位置插入图片，但设置逻辑尺寸
+                        cursor = self.textCursor()
+                        image_format = QTextImageFormat()
+                        image_format.setName(image_url.toString())
+                        image_format.setWidth(logical_width)
+                        image_format.setHeight(logical_height)
+                        cursor.insertImage(image_format)
+                    else:
+                        # 非视网膜屏幕，正常处理
+                        self.document().addResource(QTextDocument.ImageResource, image_url, compressed_image)
+
+                        # 在光标位置插入图片
+                        cursor = self.textCursor()
+                        image_format = QTextImageFormat()
+                        image_format.setName(image_url.toString())
+                        cursor.insertImage(image_format)
                 else:
                     # 如果转换失败，插入错误信息
                     cursor = self.textCursor()
@@ -208,20 +262,20 @@ class FeedbackUI(QMainWindow):
             # 应用自定义样式
             styled_html = f"""
             <div style="
-                line-height: 1.6;
-                color: white;
+                line-height: 1.2;
+                color: #ccc;
                 font-family: system-ui, -apple-system, sans-serif;
             ">
                 {html}
             </div>
             <style>
                 /* 标题样式 */
-                h1 {{ color: #FF9800; margin: 20px 0 15px 0; font-size: 1.5em; }}
-                h2 {{ color: #2196F3; margin: 15px 0 10px 0; font-size: 1.3em; }}
+                h1 {{ color: #FF9800; margin: 20px 0 15px 0; font-size: 1.3em; }}
+                h2 {{ color: #2196F3; margin: 15px 0 10px 0; font-size: 1.2em; }}
                 h3 {{ color: #4CAF50; margin: 10px 0 5px 0; font-size: 1.1em; }}
 
                 /* 列表样式 */
-                ul {{ margin: 10px 0; padding-left: 20px; }}
+                ul {{ margin: 6px 0; padding-left: 20px; }}
                 li {{ margin: 4px 0; }}
 
                 /* 代码样式 */
@@ -242,7 +296,7 @@ class FeedbackUI(QMainWindow):
                 }}
 
                 /* 段落样式 */
-                p {{ margin: 8px 0; }}
+                p {{ margin: 4px 0; }}
 
                 /* 强调样式 */
                 strong {{ color: #FFD54F; }}
@@ -269,50 +323,14 @@ class FeedbackUI(QMainWindow):
             return styled_html
 
         except ImportError:
-            # 如果markdown库未安装，回退到简单转换
-            return self._simple_markdown_to_html(markdown_text)
-        except Exception as e:
-            # 如果转换出错，显示原始文本
+            # Fallback if markdown library is not installed
+            # Log that markdown library is not found and basic conversion is used.
+            print("Markdown library not found. Using basic HTML escaping for description.")
             return f'<div style="color: white; line-height: 1.5;">{markdown_text.replace("<", "&lt;").replace(">", "&gt;")}</div>'
-
-    def _simple_markdown_to_html(self, markdown_text: str) -> str:
-        """简单的markdown到HTML转换，作为后备方案"""
-        import re
-
-        html = markdown_text
-
-        # HTML转义
-        html = html.replace('<', '&lt;').replace('>', '&gt;')
-
-        # 替换换行符为HTML换行
-        html = html.replace('\n', '<br>')
-
-        # 处理粗体 **text** -> <b>text</b>
-        html = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #FFD54F;">\1</strong>', html)
-
-        # 处理斜体 *text* -> <i>text</i>
-        html = re.sub(r'\*(.*?)\*', r'<em style="color: #81C784;">\1</em>', html)
-
-        # 处理代码块 `code` -> <code>code</code>
-        html = re.sub(r'`([^`]+)`', r'<code style="background-color: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px; font-family: monospace;">\1</code>', html)
-
-        # 处理标题
-        html = re.sub(r'^### (.*?)$', r'<h3 style="color: #4CAF50; margin: 10px 0 5px 0;">\1</h3>', html, flags=re.MULTILINE)
-        html = re.sub(r'^## (.*?)$', r'<h2 style="color: #2196F3; margin: 15px 0 10px 0;">\1</h2>', html, flags=re.MULTILINE)
-        html = re.sub(r'^# (.*?)$', r'<h1 style="color: #FF9800; margin: 20px 0 15px 0;">\1</h1>', html, flags=re.MULTILINE)
-
-        # 处理列表项 - text -> <li>text</li>
-        html = re.sub(r'^- (.*?)$', r'<li style="margin: 2px 0;">\1</li>', html, flags=re.MULTILINE)
-
-        # 处理✅表情符号和特殊字符
-        html = html.replace('✅', '<span style="color: #4CAF50;">✅</span>')
-        html = html.replace('🔧', '<span style="color: #FF9800;">🔧</span>')
-        html = html.replace('🎯', '<span style="color: #2196F3;">🎯</span>')
-
-        # 包装在div中并设置基础样式
-        html = f'<div style="line-height: 1.5; color: white;">{html}</div>'
-
-        return html
+        except Exception as e:
+            # Fallback for any other error during markdown conversion
+            print(f"Error during markdown conversion: {e}. Using basic HTML escaping.")
+            return f'<div style="color: white; line-height: 1.5;">{markdown_text.replace("<", "&lt;").replace(">", "&gt;")}</div>'
 
     def _create_ui(self):
         central_widget = QWidget()
@@ -324,7 +342,7 @@ class FeedbackUI(QMainWindow):
         self.description_text = QTextEdit()
         self.description_text.setHtml(self._convert_markdown_to_html(self.prompt))  # 使用HTML来渲染markdown
         self.description_text.setReadOnly(True)  # 设置为只读，但可以选择和复制
-        self.description_text.setMaximumHeight(400)  # 设置最大高度，防止按钮溢出屏幕
+        self.description_text.setMaximumHeight(600)  # 设置最大高度，防止按钮溢出屏幕
         self.description_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 需要时显示滚动条
         self.description_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
@@ -454,6 +472,21 @@ class FeedbackUI(QMainWindow):
 
         layout.addWidget(self.feedback_text)
         layout.addLayout(button_layout)
+        # 增加一行文本 ： by rowanyang 居中显示，允许选中和复制文本
+        by_rowanyang_label = QLabel("Contact: RowanYang")
+        font = by_rowanyang_label.font()
+        font.setPointSize(font.pointSize() - 2)  # Decrease font size by 2 points
+        by_rowanyang_label.setFont(font)
+        by_rowanyang_label.setStyleSheet("color: gray;")
+        by_rowanyang_label.setTextInteractionFlags(Qt.TextSelectableByMouse) # Allow text selection
+
+        # Create a QHBoxLayout to align "By RowanYang" to the center
+        by_rowanyang_layout = QHBoxLayout()
+        by_rowanyang_layout.addStretch(1)
+        by_rowanyang_layout.addWidget(by_rowanyang_label)
+        by_rowanyang_layout.addStretch(1)
+        layout.addSpacing(10) # 为 "By RowanYang" 文本布局添加上边距
+        layout.addLayout(by_rowanyang_layout)
 
     def _submit_feedback(self):
         feedback_text = self.feedback_text.toPlainText().strip()
@@ -479,19 +512,14 @@ class FeedbackUI(QMainWindow):
         if feedback_text:
             final_feedback_parts.append(feedback_text)
 
-        # Add image information with Base64 data if any
-        if image_data:
-            image_info_parts = ["包含的图片:"]
-            for i, img_info in enumerate(image_data, 1):
-                image_info_parts.append(f"\n图片 {i}: Base64数据: data:image/png;base64,{img_info['base64']}")
-                image_info_parts.append("")  # 空行分隔
-            final_feedback_parts.append("\n".join(image_info_parts))
 
         # Join with a newline if both parts exist
         final_feedback = "\n\n".join(final_feedback_parts)
+        images_b64 = [img['base64'] for img in image_data]
 
         self.feedback_result = FeedbackResult(
             interactive_feedback=final_feedback,
+            images=images_b64
         )
         self.close()
 

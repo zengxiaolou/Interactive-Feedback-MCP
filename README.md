@@ -4,6 +4,12 @@ Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-l
 
 **Note:** This server is designed to run locally alongside the MCP client (e.g., Claude Desktop, VS Code), as it needs direct access to the user's operating system to display notifications.
 
+## New Features
+
+- Beautiful UI
+- Support pasting images
+- Support markdown format
+
 ## 🖼️ Example
 
 ![Interactive Feedback Example](https://raw.githubusercontent.com/poliva/interactive-feedback-mcp/refs/heads/main/.github/example.png)
