@@ -66,11 +66,6 @@ def interactive_feedback(
 ) -> Tuple[str | Image, ...]:
     """
     Request interactive feedback from the user.
-
-    返回策略：
-      • 只返回文字 → (str,)
-      • 只返回 1 张图 → (Image,)
-      • 文字 + N 张图 → (str, Image, Image, …)
     """
     predefined_options_list = predefined_options if isinstance(predefined_options, list) else None
     result_dict = launch_feedback_ui(message, predefined_options_list)
@@ -92,7 +87,7 @@ def interactive_feedback(
     if txt and images:
         return (txt, *images)
     elif txt:
-        return (txt,)
+        return txt
     elif images:
         return (images[0],) if len(images) == 1 else tuple(images)
     else:
