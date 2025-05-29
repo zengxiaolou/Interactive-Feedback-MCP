@@ -66,6 +66,10 @@
 }
 ```
 
+如果无法成功启动，复制下图中的命令，在终端中执行，看看报什么错误，一般是 python 安装相关。
+
+![启动命令](./help.png)
+
 2. 在您的 AI 助手（在 Cursor Settings > Rules > User Rules 中）的自定义规则中添加以下内容：
 
 > 如果需求或指示不明确，请使用 interactive_feedback 工具向用户询问澄清问题，不要做出假设。如果可能，通过 interactive_feedback MCP 工具向用户提供预设选项以方便快速决策。
