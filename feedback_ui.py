@@ -15,7 +15,7 @@ from typing import Optional, TypedDict, List
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QCheckBox, QTextEdit, QGroupBox,
-    QFrame
+    QFrame, QScrollArea, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal, QObject, QTimer, QSettings, QUrl, QDateTime, QBuffer, QIODevice
 from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QPalette, QColor, QTextImageFormat, QTextDocument, QPixmap
@@ -54,6 +54,9 @@ class FeedbackTextEdit(QTextEdit):
     DEFAULT_MAX_IMAGE_WIDTH = 1624
     DEFAULT_MAX_IMAGE_HEIGHT = 1624
     DEFAULT_IMAGE_FORMAT = "PNG"
+
+    # 定义类级别的信号
+    image_pasted = Signal(QPixmap)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -135,51 +138,13 @@ class FeedbackTextEdit(QTextEdit):
                             }
                             self.image_data.append(image_info)
 
-                            # 生成一个唯一URL用于在界面中显示
-                            timestamp_ms = QDateTime.currentMSecsSinceEpoch()
-                            image_url = QUrl(f"image://pasted_image_{timestamp_ms}")
+                            # 发出信号，通知上层组件有新图片被粘贴
+                            if isinstance(image, QPixmap):
+                                pixmap = image
+                            else:
+                                pixmap = QPixmap.fromImage(image)
+                            self.image_pasted.emit(pixmap)
 
-                            try:
-                                # 处理视网膜屏幕：根据设备像素比调整图像
-                                if self.device_pixel_ratio > 1.0:
-                                    # 对于视网膜屏幕，创建更高分辨率的图像
-                                    high_res_image = image
-
-                                    # 获取原始尺寸
-                                    original_width = high_res_image.width()
-                                    original_height = high_res_image.height()
-
-                                    # 计算逻辑尺寸（显示尺寸）
-                                    logical_width = original_width / self.device_pixel_ratio
-                                    logical_height = original_height / self.device_pixel_ratio
-
-                                    # 将图片添加到文档资源中以便显示
-                                    self.document().addResource(QTextDocument.ImageResource, image_url, high_res_image)
-
-                                    # 在光标位置插入图片，但设置逻辑尺寸
-                                    cursor = self.textCursor()
-                                    image_format = QTextImageFormat()
-                                    image_format.setName(image_url.toString())
-                                    image_format.setWidth(logical_width)
-                                    image_format.setHeight(logical_height)
-                                    cursor.insertImage(image_format)
-                                else:
-                                    # 非视网膜屏幕，正常处理
-                                    self.document().addResource(QTextDocument.ImageResource, image_url, image)
-
-                                    # 在光标位置插入图片
-                                    cursor = self.textCursor()
-                                    image_format = QTextImageFormat()
-                                    image_format.setName(image_url.toString())
-                                    cursor.insertImage(image_format)
-                            except Exception as e:
-                                print(f"处理图片显示时出错: {e}")
-                                cursor = self.textCursor()
-                                cursor.insertText(f"[图片显示失败: {str(e)}]")
-                        else:
-                            # 如果转换失败，插入错误信息
-                            cursor = self.textCursor()
-                            cursor.insertText("[图片处理失败: 转换为Base64失败]")
                     except Exception as e:
                         print(f"处理图片时出错: {e}")
                         cursor = self.textCursor()
@@ -532,8 +497,57 @@ class FeedbackUI(QMainWindow):
 
             layout.addWidget(options_frame)
 
+        # 添加图片预览区域
+        self.images_container = QFrame()
+        self.images_container.setStyleSheet("""
+            QFrame {
+                background: transparent;
+                border: none;
+                padding: 5px;
+                margin-bottom: 5px;
+            }
+        """)
+        self.images_layout = QHBoxLayout(self.images_container)
+        self.images_layout.setSpacing(5)  # 减少图片间距，从15改为5
+        self.images_layout.setContentsMargins(0, 0, 0, 0)  # 移除内边距
+        self.images_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 图片左对齐且垂直居中
+        self.images_container.setVisible(False)  # 默认隐藏
+        self.images_container.setMinimumHeight(100)  # 设置最小高度
+
+        # 添加水平滚动支持
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setMinimumHeight(110)  # 设置最小高度
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setFrameShape(QFrame.NoFrame)  # 无边框
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:horizontal {
+                height: 8px;
+                background: rgba(0, 0, 0, 0.1);
+                border-radius: 4px;
+                margin: 0px 0px 0px 0px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #666;
+                border-radius: 4px;
+                min-width: 20px;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
+            }
+        """)
+        scroll_area.setWidget(self.images_container)
+        layout.addWidget(scroll_area)
+
         # Free-form text feedback
         self.feedback_text = FeedbackTextEdit()
+        # 连接图片粘贴信号
+        self.feedback_text.image_pasted.connect(self._on_image_pasted)
         # Increase font size and apply modern border to text edit
         font = self.feedback_text.font()
         font.setPointSize(font.pointSize() + 3)
@@ -684,6 +698,142 @@ class FeedbackUI(QMainWindow):
             return FeedbackResult(interactive_feedback="")
 
         return self.feedback_result
+
+    # 添加处理图片粘贴的方法
+    def _on_image_pasted(self, pixmap):
+        """处理粘贴的图片，显示在图片预览区域"""
+        # 确保图片容器可见
+        if not self.images_container.isVisible():
+            self.images_container.setVisible(True)
+            # 只有第一次显示容器时添加一个弹性空间，确保所有图片靠左对齐
+            self.images_layout.addStretch(1)
+
+        # 获取原始图片尺寸
+        original_width = pixmap.width()
+        original_height = pixmap.height()
+
+        # 固定高度，稍微降低高度确保完整显示
+        target_height = 70
+
+        # 计算保持宽高比的缩放尺寸
+        scaled_width = int(original_width * (target_height / original_height))
+
+        # 创建一个容器帧用于放置图片和删除按钮
+        image_frame = QFrame()
+        image_frame.setMinimumWidth(scaled_width)
+        image_frame.setStyleSheet("""
+            QFrame {
+                background: transparent;
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            }
+        """)
+
+        # 使用QGridLayout，完全没有间距
+        frame_layout = QGridLayout(image_frame)
+        frame_layout.setContentsMargins(0, 0, 0, 0)
+        frame_layout.setSpacing(0)
+
+        # 创建图片标签
+        image_label = QLabel()
+        image_label.setStyleSheet("border: none; background: transparent;")
+        image_label.setScaledContents(False)
+        image_label.setAlignment(Qt.AlignCenter)
+
+        # 确保图片容器有足够空间但不超出
+        image_label.setMinimumSize(scaled_width, target_height)
+        image_label.setMaximumSize(scaled_width, target_height)
+
+        # 缩放图片，保持宽高比，确保完整显示（contain模式）
+        scaled_pixmap = pixmap.scaled(
+            scaled_width,
+            target_height,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        # 支持视网膜屏幕
+        device_pixel_ratio = QApplication.primaryScreen().devicePixelRatio()
+        if device_pixel_ratio > 1.0:
+            # 对于高DPI屏幕，创建更高分辨率的pixmap
+            hires_scaled_width = int(scaled_width * device_pixel_ratio)
+            hires_target_height = int(target_height * device_pixel_ratio)
+
+            hires_pixmap = pixmap.scaled(
+                hires_scaled_width,
+                hires_target_height,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+
+            # 设置设备像素比
+            hires_pixmap.setDevicePixelRatio(device_pixel_ratio)
+            image_label.setPixmap(hires_pixmap)
+        else:
+            image_label.setPixmap(scaled_pixmap)
+
+        # 删除按钮，悬浮在右上角
+        delete_button = QPushButton("×")
+        delete_button.setFixedSize(18, 18)
+        delete_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 0, 0, 0.7);
+                color: white;
+                border-radius: 9px;
+                font-weight: bold;
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            }
+            QPushButton:hover {
+                background-color: red;
+            }
+        """)
+
+        # 删除图片的功能
+        def delete_image():
+            # 获取图片索引
+            index = self.images_layout.indexOf(image_frame)
+            if index >= 0:
+                # 从布局中移除
+                widget = self.images_layout.itemAt(index).widget()
+                if widget:
+                    widget.setParent(None)
+                    widget.deleteLater()
+
+                    # 从图片数据列表中删除
+                    if index < len(self.feedback_text.image_data):
+                        del self.feedback_text.image_data[index]
+
+                    # 如果没有图片了，隐藏容器
+                    if self.images_layout.count() == 0:
+                        self.images_container.setVisible(False)
+
+        delete_button.clicked.connect(delete_image)
+
+        # 将图片和删除按钮添加到布局
+        frame_layout.addWidget(image_label, 0, 0)
+        frame_layout.addWidget(delete_button, 0, 0, Qt.AlignTop | Qt.AlignRight)
+
+        # 添加到图片布局，确保在弹性空间之前插入
+        if self.images_layout.count() > 0:
+            # 找到弹性空间的索引
+            stretch_index = -1
+            for i in range(self.images_layout.count()):
+                if self.images_layout.itemAt(i).spacerItem():
+                    stretch_index = i
+                    break
+
+            if stretch_index >= 0:
+                # 在弹性空间之前插入图片
+                self.images_layout.insertWidget(stretch_index, image_frame)
+            else:
+                # 如果没有找到弹性空间，直接添加到末尾
+                self.images_layout.addWidget(image_frame)
+        else:
+            # 如果布局为空，直接添加图片
+            self.images_layout.addWidget(image_frame)
 
 def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, output_file: Optional[str] = None) -> Optional[FeedbackResult]:
     app = QApplication.instance() or QApplication()
