@@ -8,6 +8,7 @@ import json
 import argparse
 import base64
 import uuid
+import re  # 将re导入移至顶部
 from datetime import datetime
 from typing import Optional, TypedDict, List
 
@@ -251,9 +252,106 @@ class FeedbackUI(QMainWindow):
 
         self._create_ui()
 
+    def _preprocess_text(self, text: str) -> str:
+        """
+        预处理文本，处理转义字符问题
+        """
+        # 记录原始文本（用于调试）
+        print(f"原始文本: {repr(text)}")
+
+        # 这里判断文本中是否包含字面上的 \n（反斜杠 + n）
+        # 需要先处理真正的转义序列，然后再处理字面上的 "\n" 字符串
+
+        # 1. 如果文本不包含真正的换行符，但包含 \n 字符序列，则需要替换
+        if '\n' not in text and '\\n' in text:
+            print("处理字面上的 \\n 字符序列")
+            text = text.replace('\\n', '\n')
+            text = text.replace('\\t', '\t')
+            text = text.replace('\\r', '\r')
+
+        # 2. 替换 Markdown 中的硬换行标记
+        text = text.replace('  \n', '\n')
+
+        print(f"预处理后文本: {repr(text)}")
+        return text
+
+    def _is_markdown(self, text: str) -> bool:
+        """
+        检测文本是否可能是Markdown格式
+        通过检查常见Markdown语法特征来判断
+        """
+        # 如果文本为空，不视为Markdown
+        if not text or text.strip() == "":
+            return False
+
+        # 预处理文本，处理转义字符
+        text = self._preprocess_text(text)
+
+        # 检查常见的Markdown语法特征
+        markdown_patterns = [
+            r'^#{1,6}\s+.+',                  # 标题: # 标题文本
+            r'\*\*.+?\*\*',                   # 粗体: **文本**
+            r'\*.+?\*',                       # 斜体: *文本*
+            r'_.+?_',                         # 斜体: _文本_
+            r'`[^`]+`',                       # 行内代码: `代码`
+            r'^\s*```',                       # 代码块: ```
+            r'^\s*>',                         # 引用: > 文本
+            r'^\s*[-*+]\s+',                  # 无序列表: - 项目 或 * 项目 或 + 项目
+            r'^\s*\d+\.\s+',                  # 有序列表: 1. 项目
+            r'\[.+?\]\(.+?\)',                # 链接: [文本](URL)
+            r'!\[.+?\]\(.+?\)',               # 图片: ![alt](URL)
+            r'\|.+\|.+\|',                    # 表格
+            r'^-{3,}$',                       # 水平线: ---
+            r'^={3,}$',                       # 水平线: ===
+        ]
+
+        # 遍历文本的每一行，检查是否包含Markdown语法特征
+        lines = text.split('\n')
+        markdown_features_count = 0
+
+        for line in lines:
+            for pattern in markdown_patterns:
+                if re.search(pattern, line, re.MULTILINE):
+                    markdown_features_count += 1
+                    # 如果发现明确的Markdown特征，立即返回True
+                    if pattern in [r'^#{1,6}\s+.+', r'^\s*```', r'^\s*>', r'^\s*[-*+]\s+', r'^\s*\d+\.\s+', r'\|.+\|.+\|', r'^-{3,}$', r'^={3,}$']:
+                        return True
+
+        # 如果文本中包含一定数量的Markdown特征，则视为Markdown
+        # 这里根据特征数量和文本长度的比例来判断
+        # 如果特征数量超过2个或特征密度较高，则视为Markdown
+        return markdown_features_count >= 2 or (markdown_features_count > 0 and markdown_features_count / len(lines) > 0.1)
+
+    def _convert_text_to_html(self, text: str) -> str:
+        """
+        将普通文本转换为HTML格式
+        保留换行和空格，并进行基本的HTML转义
+        """
+        # 预处理文本，处理转义字符
+        text = self._preprocess_text(text)
+
+        # HTML转义
+        escaped_text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        # 保留换行
+        html_text = escaped_text.replace("\n", "<br>")
+
+        # 应用样式，去除多余的缩进
+        styled_html = f"""<div style="
+            line-height: 1.5;
+            color: #ccc;
+            font-family: system-ui, -apple-system, sans-serif;
+            white-space: pre-wrap;
+        ">{html_text}</div>"""
+
+        return styled_html
+
     def _convert_markdown_to_html(self, markdown_text: str) -> str:
         """使用markdown库将markdown转换为HTML"""
         try:
+            # 预处理文本，处理转义字符
+            markdown_text = self._preprocess_text(markdown_text)
+
             import markdown
             from markdown.extensions import codehilite, tables, toc
 
@@ -270,15 +368,12 @@ class FeedbackUI(QMainWindow):
             # 转换markdown到HTML
             html = FeedbackUI._markdown_instance.convert(markdown_text)
 
-            # 应用自定义样式
-            styled_html = f"""
-            <div style="
+            # 应用自定义样式，去除多余的缩进
+            styled_html = f"""<div style="
                 line-height: 1.2;
                 color: #ccc;
                 font-family: system-ui, -apple-system, sans-serif;
-            ">
-                {html}
-            </div>
+            ">{html}</div>
             <style>
                 /* 标题样式 */
                 h1 {{ color: #FF9800; margin: 20px 0 15px 0; font-size: 1.3em; }}
@@ -328,8 +423,7 @@ class FeedbackUI(QMainWindow):
                     background-color: rgba(255,255,255,0.1);
                     font-weight: bold;
                 }}
-            </style>
-            """
+            </style>"""
 
             return styled_html
 
@@ -337,11 +431,11 @@ class FeedbackUI(QMainWindow):
             # Fallback if markdown library is not installed
             # Log that markdown library is not found and basic conversion is used.
             print("Markdown library not found. Using basic HTML escaping for description.")
-            return f'<div style="color: white; line-height: 1.5;">{markdown_text.replace("<", "&lt;").replace(">", "&gt;")}</div>'
+            return self._convert_text_to_html(markdown_text)
         except Exception as e:
             # Fallback for any other error during markdown conversion
             print(f"Error during markdown conversion: {e}. Using basic HTML escaping.")
-            return f'<div style="color: white; line-height: 1.5;">{markdown_text.replace("<", "&lt;").replace(">", "&gt;")}</div>'
+            return self._convert_text_to_html(markdown_text)
 
     def _create_ui(self):
         central_widget = QWidget()
@@ -351,7 +445,49 @@ class FeedbackUI(QMainWindow):
 
         # Description text area (from self.prompt) - Support multiline, selectable and copyable with markdown support
         self.description_text = QTextEdit()
-        self.description_text.setHtml(self._convert_markdown_to_html(self.prompt))  # 使用HTML来渲染markdown
+
+        # 如果是从命令行参数传入的文本，可能需要特殊处理
+        if isinstance(self.prompt, str) and self.prompt.startswith('"') and self.prompt.endswith('"'):
+            # 去除引号
+            self.prompt = self.prompt[1:-1]
+
+        try:
+            # 尝试检测并处理Markdown
+            is_markdown = self._is_markdown(self.prompt)
+
+            # 记录日志，帮助调试
+            print(f"检测到文本类型: {'Markdown' if is_markdown else '普通文本'}")
+
+            if is_markdown:
+                # 尝试使用Markdown库渲染
+                try:
+                    import markdown
+                    self.description_text.setHtml(self._convert_markdown_to_html(self.prompt))
+                    print("使用Markdown库渲染成功")
+                except ImportError:
+                    print("未找到Markdown库，回退到普通文本渲染")
+                    self.description_text.setHtml(self._convert_text_to_html(self.prompt))
+                except Exception as e:
+                    print(f"Markdown渲染失败: {e}，回退到普通文本渲染")
+                    self.description_text.setHtml(self._convert_text_to_html(self.prompt))
+            else:
+                # 使用普通文本渲染
+                self.description_text.setHtml(self._convert_text_to_html(self.prompt))
+                print("使用普通文本渲染")
+        except Exception as e:
+            # 如果出现任何错误，回退到最基本的文本显示
+            print(f"文本处理过程中出现错误: {e}")
+
+            # 尝试直接将转义字符转换为实际字符后设置为纯文本
+            try:
+                processed_text = self._preprocess_text(self.prompt)
+                self.description_text.setPlainText(processed_text)
+                print("使用纯文本显示（预处理后）")
+            except:
+                # 最后的回退方案
+                self.description_text.setPlainText(self.prompt)
+                print("使用纯文本显示（原始文本）")
+
         self.description_text.setReadOnly(True)  # 设置为只读，但可以选择和复制
         self.description_text.setMaximumHeight(600)  # 设置最大高度，防止按钮溢出屏幕
         self.description_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 需要时显示滚动条
@@ -553,6 +689,17 @@ def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, out
     app = QApplication.instance() or QApplication()
     app.setPalette(get_dark_mode_palette(app))
     app.setStyle("Fusion")
+
+    # 处理从命令行传入的参数中可能包含的转义字符
+    if isinstance(prompt, str) and '\\' in prompt:
+        try:
+            # 尝试解析可能的Python字符串字面量
+            # 注意：这里我们不使用eval，而是手动处理常见的转义序列
+            prompt = prompt.replace('\\n', '\n').replace('\\t', '\t').replace('\\r', '\r')
+            print(f"预处理命令行参数: {repr(prompt)}")
+        except Exception as e:
+            print(f"预处理命令行参数时出错: {e}")
+
     ui = FeedbackUI(prompt, predefined_options)
     result = ui.run()
 
