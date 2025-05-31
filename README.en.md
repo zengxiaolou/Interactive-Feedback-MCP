@@ -40,14 +40,14 @@ This server exposes the following tool via the Model Context Protocol (MCP):
 ## 📦 Installation
 
 1.  **Prerequisites:**
-    - Python 3.11 or newer.
+    - Python 3.10+
     - [uv](https://github.com/astral-sh/uv) (Python package manager). Install it with:
       - Windows: `pip install uv`
       - Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
       - macOS: `brew install uv`
 2.  **Get the code:**
     - Clone this repository:
-      `git clone https://github.com/pauoliva/interactive-feedback-mcp.git`
+      `git clone https://github.com/kele527/interactive-feedback-mcp.git`
     - Or download the source code.
 
 ## ⚙️ Configuration
