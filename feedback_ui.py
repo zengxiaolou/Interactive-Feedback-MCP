@@ -585,10 +585,12 @@ class FeedbackUI(QMainWindow):
         # Create the submit button
         submit_button = QPushButton("&提交")
         submit_button.clicked.connect(self._submit_feedback)
+        submit_button.setCursor(Qt.PointingHandCursor)  # 设置鼠标指针为手形
 
         # Create the cancel button
         cancel_button = QPushButton("&取消")
         cancel_button.clicked.connect(self.close) # Connect cancel button to close the window
+        cancel_button.setCursor(Qt.PointingHandCursor)  # 设置鼠标指针为手形
 
         # Add buttons to the horizontal layout
         button_layout.addWidget(cancel_button) # Put cancel on the left
