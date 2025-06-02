@@ -306,7 +306,7 @@ class FeedbackUI(QMainWindow):
         styled_html = f"""<div style="
             line-height: 1.5;
             color: #ccc;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family:  sans-serif;
             white-space: pre-wrap;
         ">{html_text}</div>"""
 
@@ -577,7 +577,7 @@ class FeedbackUI(QMainWindow):
         self.feedback_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 需要时显示滚动条
         self.feedback_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-        self.feedback_text.setPlaceholderText("在此输入您的下一步要求或反馈 (Ctrl+Enter 提交)")
+        self.feedback_text.setPlaceholderText("在此输入您的下一步要求或反馈 (Ctrl+Enter 提交) 支持粘贴图片")
 
         # Create a horizontal layout for buttons
         button_layout = QHBoxLayout()
@@ -636,7 +636,7 @@ class FeedbackUI(QMainWindow):
         layout.addLayout(button_layout)
         # 增加一行文本 ： by rowanyang 居中显示，允许选中和复制文本
         by_rowanyang_label = QLabel("支持 CMD+/- 缩放字体  Contact: RowanYang")
-        by_rowanyang_label.setStyleSheet(""" color: gray; font-size: 10pt; font-family: "Microsoft YaHei"; """)
+        by_rowanyang_label.setStyleSheet(""" color: gray; font-size: 10pt; font-family:"PingFang SC", "Hiragino Sans GB", sans-serif; """)
         by_rowanyang_label.setTextInteractionFlags(Qt.TextSelectableByMouse) # Allow text selection
 
         # Create a QHBoxLayout to align "By RowanYang" to the center
@@ -858,6 +858,7 @@ class FeedbackUI(QMainWindow):
         # 删除按钮，悬浮在右上角
         delete_button = QPushButton("×")
         delete_button.setFixedSize(18, 18)
+        delete_button.setCursor(Qt.PointingHandCursor)
         delete_button.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 0, 0, 0.7);
@@ -865,8 +866,8 @@ class FeedbackUI(QMainWindow):
                 border-radius: 9px;
                 font-weight: bold;
                 border: none;
-                padding: 0px;
-                margin: 0px;
+                padding-bottom: 2px;
+                qproperty-alignment: AlignCenter;
             }
             QPushButton:hover {
                 background-color: red;
