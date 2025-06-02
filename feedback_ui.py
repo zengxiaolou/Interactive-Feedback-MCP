@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QFrame, QScrollArea, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal, QObject, QTimer, QSettings, QUrl, QDateTime, QBuffer, QIODevice
-from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QPalette, QColor, QTextImageFormat, QTextDocument, QPixmap
+from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QPalette, QColor, QTextImageFormat, QTextDocument, QPixmap, QShortcut, QKeySequence
 
 class FeedbackResult(TypedDict):
     interactive_feedback: str
@@ -216,6 +216,7 @@ class FeedbackUI(QMainWindow):
         self.settings.endGroup() # End "MainWindow_General" group
 
         self._create_ui()
+        self._setup_shortcuts()  # 添加快捷键设置
 
     def _preprocess_text(self, text: str) -> str:
         """
@@ -224,19 +225,19 @@ class FeedbackUI(QMainWindow):
         # 记录原始文本（用于调试）
         print(f"原始文本: {repr(text)}")
 
-        # 这里判断文本中是否包含字面上的 \n（反斜杠 + n）
-        # 需要先处理真正的转义序列，然后再处理字面上的 "\n" 字符串
-
-        # 1. 如果文本不包含真正的换行符，但包含 \n 字符序列，则需要替换
-        if '\n' not in text and '\\n' in text:
-            print("处理字面上的 \\n 字符序列")
+        # 处理字面上的转义序列
+        if isinstance(text, str):
+            # 1. 处理字面上的转义序列
+            text = text.replace('\\\\', '\\')  # 先处理双反斜杠
             text = text.replace('\\n', '\n')
             text = text.replace('\\t', '\t')
             text = text.replace('\\r', '\r')
 
-        # 2. 替换 Markdown 中的硬换行标记
-        text = text.replace('  \n', '\n')
+            # 2. 规范化换行符
+            text = text.replace('\r\n', '\n')
+            text = text.replace('\r', '\n')
 
+        # 记录处理后的文本（用于调试）
         print(f"预处理后文本: {repr(text)}")
         return text
 
@@ -458,11 +459,6 @@ class FeedbackUI(QMainWindow):
         self.description_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 需要时显示滚动条
         self.description_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-        # Increase font size for description text
-        font = self.description_text.font()
-        font.setPointSize(font.pointSize() + 3) # Increase font size by 4 points
-        self.description_text.setFont(font)
-
         # 设置样式，让它看起来更像信息展示区域而不是输入框
         self.description_text.setStyleSheet(
             "QTextEdit {"
@@ -489,7 +485,7 @@ class FeedbackUI(QMainWindow):
                 checkbox = QCheckBox(option)
                 # Increase font size for checkboxes
                 font = checkbox.font()
-                font.setPointSize(font.pointSize() + 3)
+                font.setPointSize(font.pointSize())
                 checkbox.setFont(font)
                 self.option_checkboxes.append(checkbox)
                 options_layout.addWidget(checkbox)
@@ -555,7 +551,7 @@ class FeedbackUI(QMainWindow):
         self.feedback_text.image_pasted.connect(self._on_image_pasted)
         # Increase font size and apply modern border to text edit
         font = self.feedback_text.font()
-        font.setPointSize(font.pointSize() + 3)
+        font.setPointSize(font.pointSize() )
         self.feedback_text.setFont(font)
         self.feedback_text.setStyleSheet(
             "QTextEdit {"
@@ -637,7 +633,7 @@ class FeedbackUI(QMainWindow):
         layout.addWidget(self.feedback_text)
         layout.addLayout(button_layout)
         # 增加一行文本 ： by rowanyang 居中显示，允许选中和复制文本
-        by_rowanyang_label = QLabel("Contact: RowanYang")
+        by_rowanyang_label = QLabel("支持 CMD+/- 缩放字体  Contact: RowanYang")
         font = by_rowanyang_label.font()
         font.setPointSize(font.pointSize() - 2)  # Decrease font size by 2 points
         by_rowanyang_label.setFont(font)
@@ -651,6 +647,74 @@ class FeedbackUI(QMainWindow):
         by_rowanyang_layout.addStretch(1)
         layout.addSpacing(10) # 为 "By RowanYang" 文本布局添加上边距
         layout.addLayout(by_rowanyang_layout)
+
+    def _setup_shortcuts(self):
+        """设置字体缩放快捷键"""
+        # 放大字体: Ctrl+=
+        zoom_in = QShortcut(QKeySequence("Ctrl+="), self)
+        zoom_in.activated.connect(lambda: self.adjust_font_size(1.1))
+
+        # 缩小字体: Ctrl+-
+        zoom_out = QShortcut(QKeySequence("Ctrl+-"), self)
+        zoom_out.activated.connect(lambda: self.adjust_font_size(0.9))
+
+        # 重置字体: Ctrl+0
+        reset_font = QShortcut(QKeySequence("Ctrl+0"), self)
+        reset_font.activated.connect(self.reset_font_size)
+
+    def adjust_font_size(self, factor: float):
+        """按比例调整所有字体大小"""
+        app = QApplication.instance()
+        current_font = app.font()
+        new_size = max(8, int(current_font.pointSize() * factor))  # 最小8pt
+        current_font.setPointSize(new_size)
+        app.setFont(current_font)
+        self._update_all_fonts()
+        self._save_font_size(new_size)  # 保存字体大小到设置
+
+    def reset_font_size(self):
+        """重置为默认字体大小"""
+        app = QApplication.instance()
+        default_font = app.font()
+        default_size = 15  # 默认字体大小
+        default_font.setPointSize(default_size)
+        app.setFont(default_font)
+        self._update_all_fonts()
+        self._save_font_size(default_size)  # 保存重置后的字体大小
+
+    def _save_font_size(self, size: int):
+        """保存字体大小到设置"""
+        self.settings.beginGroup("FontSettings")
+        self.settings.setValue("fontSize", size)
+        self.settings.endGroup()
+
+    def _load_font_size(self) -> int:
+        """从设置加载字体大小，如果没有则返回默认值"""
+        self.settings.beginGroup("FontSettings")
+        size = self.settings.value("fontSize", 15, type=int)  # 默认15pt
+        self.settings.endGroup()
+        return size
+
+    def _update_all_fonts(self):
+        """更新UI中所有控件的字体"""
+        # 递归更新所有子控件的字体
+        def update_widget_font(widget):
+            widget.setFont(QApplication.font())
+            for child in widget.children():
+                if isinstance(child, QWidget):
+                    update_widget_font(child)
+
+        update_widget_font(self)
+
+    def showEvent(self, event):
+        """窗口显示时加载保存的字体大小"""
+        super().showEvent(event)
+        app = QApplication.instance()
+        saved_size = self._load_font_size()
+        current_font = app.font()
+        current_font.setPointSize(saved_size)
+        app.setFont(current_font)
+        self._update_all_fonts()
 
     def _submit_feedback(self):
         feedback_text = self.feedback_text.toPlainText().strip()
@@ -851,19 +915,30 @@ class FeedbackUI(QMainWindow):
             self.images_layout.addWidget(image_frame)
 
 def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, output_file: Optional[str] = None) -> Optional[FeedbackResult]:
+    # ----- 开启高 DPI 缩放 -----
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+
+    # 创建 QApplication 或获取已有实例
     app = QApplication.instance() or QApplication()
     app.setPalette(get_dark_mode_palette(app))
     app.setStyle("Fusion")
 
-    # 处理从命令行传入的参数中可能包含的转义字符
-    if isinstance(prompt, str) and '\\' in prompt:
-        try:
-            # 尝试解析可能的Python字符串字面量
-            # 注意：这里我们不使用eval，而是手动处理常见的转义序列
-            prompt = prompt.replace('\\n', '\n').replace('\\t', '\t').replace('\\r', '\r')
-            print(f"预处理命令行参数: {repr(prompt)}")
-        except Exception as e:
-            print(f"预处理命令行参数时出错: {e}")
+    # ----- 统一设置全局默认字体大小 -----
+    default_font = app.font()           # 拿到当前系统/风格默认的 QFont
+    default_font.setPointSize(15)       # 设定全局字号为 11pt，按需修改
+    app.setFont(default_font)
+
+    # 预处理提示文本中的换行符
+    if isinstance(prompt, str):
+        # 处理转义字符
+        prompt = prompt.replace('\\\\', '\\')  # 先处理双反斜杠
+        prompt = prompt.replace('\\n', '\n')
+        prompt = prompt.replace('\\t', '\t')
+        prompt = prompt.replace('\\r', '\r')
+        # 规范化换行符
+        prompt = prompt.replace('\r\n', '\n')
+        prompt = prompt.replace('\r', '\n')
 
     ui = FeedbackUI(prompt, predefined_options)
     result = ui.run()
