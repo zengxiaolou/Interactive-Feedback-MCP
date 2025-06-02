@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QFrame, QScrollArea, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal, QObject, QTimer, QSettings, QUrl, QDateTime, QBuffer, QIODevice
-from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QPalette, QColor, QTextImageFormat, QTextDocument, QPixmap, QShortcut, QKeySequence
+from PySide6.QtGui import QTextCursor, QIcon, QKeyEvent, QPalette, QColor, QTextImageFormat, QTextDocument, QPixmap, QShortcut, QKeySequence, QFont
 
 class FeedbackResult(TypedDict):
     interactive_feedback: str
@@ -479,7 +479,7 @@ class FeedbackUI(QMainWindow):
         if self.predefined_options and len(self.predefined_options) > 0:
             options_frame = QFrame()
             options_layout = QVBoxLayout(options_frame)
-            options_layout.setContentsMargins(0,5,0,5)
+            options_layout.setContentsMargins(0,5,0,10)
 
             for option in self.predefined_options:
                 checkbox = QCheckBox(option)
@@ -557,7 +557,7 @@ class FeedbackUI(QMainWindow):
             "QTextEdit {"
             "  border-radius: 15px;"
             "  padding: 15px;"
-            "  margin: 0 0 10px 0;"
+            "  margin: 0px 0 10px 0;"
             "  border: 1px solid #444444;"
             "}"
         )
@@ -597,7 +597,7 @@ class FeedbackUI(QMainWindow):
         # Apply modern style and increase size for the submit button
         submit_button.setStyleSheet(
             "QPushButton {"
-            "  padding: 10px 20px;"
+            "  padding: 10px 20px;margin-left:20px;"
             "  font-size: 14px;"
             "  border-radius: 5px;"
             "  background-color: #2196F3; /* Blue */"
@@ -615,7 +615,7 @@ class FeedbackUI(QMainWindow):
         # Apply modern style and increase size for the cancel button
         cancel_button.setStyleSheet(
             "QPushButton {"
-            "  padding: 10px 20px;"
+            "  padding: 10px 20px;margin-right:20px;"
             "  font-size: 14px;"
             "  border-radius: 5px;"
             "  background-color: #9E9E9E; /* Grey */"
@@ -634,10 +634,7 @@ class FeedbackUI(QMainWindow):
         layout.addLayout(button_layout)
         # 增加一行文本 ： by rowanyang 居中显示，允许选中和复制文本
         by_rowanyang_label = QLabel("支持 CMD+/- 缩放字体  Contact: RowanYang")
-        font = by_rowanyang_label.font()
-        font.setPointSize(font.pointSize() - 2)  # Decrease font size by 2 points
-        by_rowanyang_label.setFont(font)
-        by_rowanyang_label.setStyleSheet("color: gray;")
+        by_rowanyang_label.setStyleSheet(""" color: gray; font-size: 10pt; font-family: "Microsoft YaHei"; """)
         by_rowanyang_label.setTextInteractionFlags(Qt.TextSelectableByMouse) # Allow text selection
 
         # Create a QHBoxLayout to align "By RowanYang" to the center
@@ -700,6 +697,19 @@ class FeedbackUI(QMainWindow):
         # 递归更新所有子控件的字体
         def update_widget_font(widget):
             widget.setFont(QApplication.font())
+
+            # 特殊处理复选框的图标大小
+            if isinstance(widget, QCheckBox):
+                # 根据当前字体大小设置图标大小
+                font_size = QApplication.font().pointSize()
+                icon_size = max(16, int(font_size * 1.2))  # 最小16px
+                widget.setStyleSheet(f"""
+                    QCheckBox::indicator {{
+                        width: {icon_size}px;
+                        height: {icon_size}px;
+                    }}
+                """)
+
             for child in widget.children():
                 if isinstance(child, QWidget):
                     update_widget_font(child)
