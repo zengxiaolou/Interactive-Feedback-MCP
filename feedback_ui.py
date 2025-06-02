@@ -406,7 +406,7 @@ class FeedbackUI(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(20,20,20,20)
+        layout.setContentsMargins(15,12,15,10)
 
         # Description text area (from self.prompt) - Support multiline, selectable and copyable with markdown support
         self.description_text = QTextEdit()
@@ -468,8 +468,7 @@ class FeedbackUI(QMainWindow):
             "QTextEdit {"
             "  border: 1px solid #444444;"
             "  border-radius: 8px;"
-            "  padding: 15px;"
-            "  margin: 0 0 15px 0;"
+            "  padding: 15px;margin-bottom:5px;"
             "  background-color: rgba(255, 255, 255, 0.05);"
             "}"
             "QTextEdit:focus {"
@@ -484,7 +483,7 @@ class FeedbackUI(QMainWindow):
         if self.predefined_options and len(self.predefined_options) > 0:
             options_frame = QFrame()
             options_layout = QVBoxLayout(options_frame)
-            options_layout.setContentsMargins(0,0,0,0)
+            options_layout.setContentsMargins(0,5,0,5)
 
             for option in self.predefined_options:
                 checkbox = QCheckBox(option)
@@ -497,27 +496,27 @@ class FeedbackUI(QMainWindow):
 
             layout.addWidget(options_frame)
 
-        # 添加图片预览区域
+        # 图片预览区域
         self.images_container = QFrame()
         self.images_container.setStyleSheet("""
             QFrame {
                 background: transparent;
                 border: none;
-                padding: 5px;
-                margin-bottom: 5px;
+                padding: 0px;
+                margin: 0px;
             }
         """)
+        self.images_container.setFixedHeight(80)  # 使用固定高度
         self.images_layout = QHBoxLayout(self.images_container)
-        self.images_layout.setSpacing(5)  # 减少图片间距，从15改为5
-        self.images_layout.setContentsMargins(0, 0, 0, 0)  # 移除内边距
+        self.images_layout.setSpacing(5)  # 减少图片间距
+        self.images_layout.setContentsMargins(0, 0, 0, 5)  # 移除内边距
         self.images_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 图片左对齐且垂直居中
         self.images_container.setVisible(False)  # 默认隐藏
-        self.images_container.setMinimumHeight(100)  # 设置最小高度
 
         # 添加水平滚动支持
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setMinimumHeight(110)  # 设置最小高度
+        scroll_area.setFixedHeight(80)  # 使用固定高度
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_area.setFrameShape(QFrame.NoFrame)  # 无边框
@@ -525,6 +524,8 @@ class FeedbackUI(QMainWindow):
             QScrollArea {
                 background: transparent;
                 border: none;
+                margin: 0px;
+                padding: 0px;
             }
             QScrollBar:horizontal {
                 height: 8px;
@@ -542,7 +543,11 @@ class FeedbackUI(QMainWindow):
             }
         """)
         scroll_area.setWidget(self.images_container)
-        layout.addWidget(scroll_area)
+        scroll_area.setVisible(False)  # 默认隐藏滚动区域
+        self.scroll_area = scroll_area  # 保存引用以便控制可见性
+        layout.addWidget(scroll_area, 0)  # 使用0作为拉伸因子，防止自动拉伸
+        # 减小滚动区域与其他元素之间的间距
+        layout.setSpacing(2)  # 设置整体布局的间距更小
 
         # Free-form text feedback
         self.feedback_text = FeedbackTextEdit()
@@ -705,6 +710,7 @@ class FeedbackUI(QMainWindow):
         # 确保图片容器可见
         if not self.images_container.isVisible():
             self.images_container.setVisible(True)
+            self.scroll_area.setVisible(True)  # 同时显示滚动区域
             # 只有第一次显示容器时添加一个弹性空间，确保所有图片靠左对齐
             self.images_layout.addStretch(1)
 
@@ -713,7 +719,7 @@ class FeedbackUI(QMainWindow):
         original_height = pixmap.height()
 
         # 固定高度，稍微降低高度确保完整显示
-        target_height = 70
+        target_height = 80  # 进一步降低图片高度至40
 
         # 计算保持宽高比的缩放尺寸
         scaled_width = int(original_width * (target_height / original_height))
@@ -806,9 +812,18 @@ class FeedbackUI(QMainWindow):
                     if index < len(self.feedback_text.image_data):
                         del self.feedback_text.image_data[index]
 
-                    # 如果没有图片了，隐藏容器
-                    if self.images_layout.count() == 0:
+                    # 检查是否还有图片
+                    has_images = False
+                    for i in range(self.images_layout.count()):
+                        item = self.images_layout.itemAt(i)
+                        if item and not item.spacerItem() and item.widget():
+                            has_images = True
+                            break
+
+                    # 如果没有图片了，隐藏容器和滚动区域
+                    if not has_images:
                         self.images_container.setVisible(False)
+                        self.scroll_area.setVisible(False)
 
         delete_button.clicked.connect(delete_image)
 
