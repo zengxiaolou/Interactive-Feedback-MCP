@@ -14,7 +14,7 @@ from typing import Optional, TypedDict, List
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QCheckBox, QTextEdit, QGroupBox,
+    QLabel, QLineEdit, QPushButton, QCheckBox, QTextEdit, QTextBrowser, QGroupBox,
     QFrame, QScrollArea, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal, QObject, QTimer, QSettings, QUrl, QDateTime, QBuffer, QIODevice
@@ -199,7 +199,7 @@ class FeedbackUI(QMainWindow):
         # 设置窗口大小为屏幕高度的60%，宽度保持800
         screen = QApplication.primaryScreen().geometry()
         screen_height = screen.height()
-        window_height = int(screen_height * 0.6)  # 屏幕高度的60%
+        window_height = int(screen_height * 0.7)  # 屏幕高度的60%
         window_width = 800
 
         # 设置窗口的初始大小，但允许用户调整
@@ -221,17 +221,43 @@ class FeedbackUI(QMainWindow):
     def _preprocess_text(self, text: str) -> str:
         """
         预处理文本，处理转义字符问题
+        特别处理从Cursor编辑器传入时的转义问题
         """
         # 记录原始文本（用于调试）
         print(f"原始文本: {repr(text)}")
 
         # 处理字面上的转义序列
         if isinstance(text, str):
-            # 1. 处理字面上的转义序列
-            text = text.replace('\\\\', '\\')  # 先处理双反斜杠
-            text = text.replace('\\n', '\n')
-            text = text.replace('\\t', '\t')
-            text = text.replace('\\r', '\r')
+            # 尝试多种解码方式来处理不同来源的转义
+
+            # 方式1: 尝试JSON解码（适用于从JSON参数传入的情况）
+            try:
+                import json
+                # 如果文本看起来像是被JSON编码过的字符串，尝试解码
+                if '\\n' in text or '\\t' in text or '\\r' in text:
+                    # 添加引号使其成为有效JSON字符串，然后解码
+                    decoded_text = json.loads(f'"{text}"')
+                    print(f"JSON解码成功: {repr(decoded_text)}")
+                    text = decoded_text
+                else:
+                    print("不需要JSON解码")
+            except (json.JSONDecodeError, ValueError):
+                print("JSON解码失败，使用字符串替换方法")
+                # 如果JSON解码失败，使用字符串替换方法
+
+                # 先检查是否存在双重转义（如 \\n）
+                if '\\\\n' in text:
+                    # 处理双重转义的换行符
+                    text = text.replace('\\\\n', '\n')
+                    text = text.replace('\\\\t', '\t')
+                    text = text.replace('\\\\r', '\r')
+                    text = text.replace('\\\\\\\\', '\\')  # 四重反斜杠变成单反斜杠
+                else:
+                    # 1. 处理字面上的转义序列
+                    text = text.replace('\\\\', '\\')  # 先处理双反斜杠
+                    text = text.replace('\\n', '\n')
+                    text = text.replace('\\t', '\t')
+                    text = text.replace('\\r', '\r')
 
             # 2. 规范化换行符
             text = text.replace('\r\n', '\n')
@@ -306,7 +332,7 @@ class FeedbackUI(QMainWindow):
         styled_html = f"""<div style="
             line-height: 1.5;
             color: #ccc;
-            font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+            font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
             white-space: pre-wrap;
         ">{html_text}</div>"""
 
@@ -363,9 +389,10 @@ class FeedbackUI(QMainWindow):
 
             # 应用自定义样式，去除多余的缩进，添加emoji支持
             styled_html = f"""<div style="
-                line-height: 1.2;
+                line-height: 1.5;
                 color: #ccc;
-                font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', system-ui, -apple-system, sans-serif;
+                font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+                white-space: pre-wrap;
             ">{html}</div>
             <style>
                 /* 标题样式 */
@@ -373,9 +400,21 @@ class FeedbackUI(QMainWindow):
                 h2 {{ color: #2196F3; margin: 15px 0 10px 0; font-size: 1.2em; }}
                 h3 {{ color: #4CAF50; margin: 10px 0 5px 0; font-size: 1.1em; }}
 
-                /* 列表样式 */
-                ul {{ margin: 6px 0; padding-left: 20px; }}
-                li {{ margin: 4px 0; }}
+                                /* 列表样式 */
+                ul, ol {{
+                    margin: 6px 0;
+                    padding-left: 20px;
+                    line-height: 1.5;
+                    font-family: inherit;
+                }}
+                li {{
+                    margin: 4px 0;
+                    line-height: 1.5;
+                    vertical-align: baseline;
+                    display: list-item;
+                    font-family: inherit;
+                    text-align: left;
+                }}
 
                 /* 代码样式 */
                 code {{
@@ -443,10 +482,10 @@ class FeedbackUI(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(15,12,15,10)
+        layout.setContentsMargins(15,8,15,5)
 
         # Description text area (from self.prompt) - Support multiline, selectable and copyable with markdown support
-        self.description_text = QTextEdit()
+        self.description_text = QTextBrowser()
 
         # 如果是从命令行参数传入的文本，可能需要特殊处理
         if isinstance(self.prompt, str) and self.prompt.startswith('"') and self.prompt.endswith('"'):
@@ -490,20 +529,23 @@ class FeedbackUI(QMainWindow):
                 self.description_text.setPlainText(self.prompt)
                 print("使用纯文本显示（原始文本）")
 
-        self.description_text.setReadOnly(True)  # 设置为只读，但可以选择和复制
+        # QTextBrowser 默认就是只读的，支持选择和复制
         self.description_text.setMaximumHeight(600)  # 设置最大高度，防止按钮溢出屏幕
         self.description_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 需要时显示滚动条
         self.description_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         # 设置样式，让它看起来更像信息展示区域而不是输入框
+        # 为 QTextBrowser 设置样式，让它看起来更像信息展示区域
         self.description_text.setStyleSheet(
-            "QTextEdit {"
-            "  border: 1px solid #444444;"
+            "QTextBrowser {"
+            # "  border: 1px solid #444444;"
             "  border-radius: 8px;"
-            "  padding: 15px;margin-bottom:5px;"
+            "  padding: 5px;"
+            "  margin-bottom: 3px;"
             "  background-color: rgba(255, 255, 255, 0.05);"
+            "  selection-background-color: #2196F3;"
             "}"
-            "QTextEdit:focus {"
+            "QTextBrowser:focus {"
             "  border: 1px solid #2196F3;"
             "}"
         )
@@ -591,22 +633,27 @@ class FeedbackUI(QMainWindow):
         self.feedback_text.setFont(font)
         self.feedback_text.setStyleSheet(
             "QTextEdit {"
-            "  border-radius: 15px;"
-            "  padding: 15px;"
+            "  border-radius: 8px;"
+            "  padding: 0px;"
             "  margin: 0px 0 10px 0;"
             "  border: 1px solid #444444;"
+            "  background-color: #222;"
             "}"
         )
+
+        # 设置一个很小的文档边距，既美观又不会有明显空白
+        document = self.feedback_text.document()
+        document.setDocumentMargin(5)
 
         # 设置最小和最大高度，以及滚动策略
         font_metrics = self.feedback_text.fontMetrics()
         row_height = font_metrics.height()
-        padding = self.feedback_text.contentsMargins().top() + self.feedback_text.contentsMargins().bottom() + 5
+        # padding = self.feedback_text.contentsMargins().top() + self.feedback_text.contentsMargins().bottom() + 5
 
         # 最小高度：5行文本
-        min_height = 5 * row_height + padding
+        min_height = 5 * row_height
         # 最大高度：10行文本，防止输入框过高
-        max_height = 10 * row_height + padding
+        max_height = 10 * row_height
 
         self.feedback_text.setMinimumHeight(min_height)
         self.feedback_text.setMaximumHeight(max_height)
@@ -977,17 +1024,6 @@ def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, out
     default_font = app.font()           # 拿到当前系统/风格默认的 QFont
     default_font.setPointSize(15)       # 设定全局字号为 11pt，按需修改
     app.setFont(default_font)
-
-    # 预处理提示文本中的换行符
-    if isinstance(prompt, str):
-        # 处理转义字符
-        prompt = prompt.replace('\\\\', '\\')  # 先处理双反斜杠
-        prompt = prompt.replace('\\n', '\n')
-        prompt = prompt.replace('\\t', '\t')
-        prompt = prompt.replace('\\r', '\r')
-        # 规范化换行符
-        prompt = prompt.replace('\r\n', '\n')
-        prompt = prompt.replace('\r', '\n')
 
     ui = FeedbackUI(prompt, predefined_options)
     result = ui.run()
