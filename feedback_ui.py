@@ -302,11 +302,11 @@ class FeedbackUI(QMainWindow):
         # 保留换行
         html_text = escaped_text.replace("\n", "<br>")
 
-        # 应用样式，去除多余的缩进
+        # 应用样式，去除多余的缩进，添加emoji字体支持
         styled_html = f"""<div style="
             line-height: 1.5;
             color: #ccc;
-            font-family:  sans-serif;
+            font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
             white-space: pre-wrap;
         ">{html_text}</div>"""
 
@@ -321,12 +321,39 @@ class FeedbackUI(QMainWindow):
             import markdown
             from markdown.extensions import codehilite, tables, toc
 
-            # 配置markdown扩展
+            # 配置markdown扩展，添加emoji支持
             extensions = ['extra', 'codehilite', 'toc']
+
+            # 尝试添加emoji扩展（如果可用）
+            try:
+                import pymdownx.emoji
+                extensions.append('pymdownx.emoji')
+                extension_configs = {
+                    'pymdownx.emoji': {
+                        'emoji_index': pymdownx.emoji.gemoji,
+                        'emoji_generator': pymdownx.emoji.to_svg,
+                        'alt': 'short',
+                        'options': {
+                            'attributes': {
+                                'align': 'absmiddle',
+                                'height': '20px',
+                                'width': '20px'
+                            },
+                            'image_path': 'https://assets-cdn.github.com/images/icons/emoji/unicode/',
+                            'non_standard_image_path': 'https://assets-cdn.github.com/images/icons/emoji/'
+                        }
+                    }
+                }
+            except ImportError:
+                print("pymdownx.emoji not available, using basic emoji support")
+                extension_configs = {}
 
             # 使用缓存的Markdown实例或创建新实例
             if FeedbackUI._markdown_instance is None:
-                FeedbackUI._markdown_instance = markdown.Markdown(extensions=extensions)
+                FeedbackUI._markdown_instance = markdown.Markdown(
+                    extensions=extensions,
+                    extension_configs=extension_configs
+                )
 
             # 重置实例以确保状态清空
             FeedbackUI._markdown_instance.reset()
@@ -334,11 +361,11 @@ class FeedbackUI(QMainWindow):
             # 转换markdown到HTML
             html = FeedbackUI._markdown_instance.convert(markdown_text)
 
-            # 应用自定义样式，去除多余的缩进
+            # 应用自定义样式，去除多余的缩进，添加emoji支持
             styled_html = f"""<div style="
                 line-height: 1.2;
                 color: #ccc;
-                font-family: system-ui, -apple-system, sans-serif;
+                font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', system-ui, -apple-system, sans-serif;
             ">{html}</div>
             <style>
                 /* 标题样式 */
@@ -373,6 +400,15 @@ class FeedbackUI(QMainWindow):
                 /* 强调样式 */
                 strong {{ color: #FFD54F; }}
                 em {{ color: #81C784; }}
+
+                /* Emoji样式优化 */
+                .emoji, img.emoji {{
+                    height: 1.2em;
+                    width: 1.2em;
+                    margin: 0 0.05em 0 0.1em;
+                    vertical-align: -0.1em;
+                    display: inline-block;
+                }}
 
                 /* 表格样式 */
                 table {{
