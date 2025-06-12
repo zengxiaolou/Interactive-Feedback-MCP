@@ -192,6 +192,7 @@ class FeedbackUI(QMainWindow):
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
         self.settings = QSettings("InteractiveFeedbackMCP", "InteractiveFeedbackMCP")
+        self.line_height = self._load_line_height()
 
         # Load general UI settings for the main window (geometry, state)
         self.settings.beginGroup("MainWindow_General")
@@ -329,10 +330,11 @@ class FeedbackUI(QMainWindow):
         html_text = escaped_text.replace("\n", "<br>")
 
         # 应用样式，去除多余的缩进，添加emoji字体支持
+        # 减小行高，并使用更具体的字体列表以保证跨平台一致性
         styled_html = f"""<div style="
-            line-height: 1.5;
+            line-height: {self.line_height};
             color: #ccc;
-            font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+            font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
             white-space: pre-wrap;
         ">{html_text}</div>"""
 
@@ -388,31 +390,34 @@ class FeedbackUI(QMainWindow):
             html = FeedbackUI._markdown_instance.convert(markdown_text)
 
             # 应用自定义样式，去除多余的缩进，添加emoji支持
-            styled_html = f"""<div style="
-                line-height: 1.5;
-                color: #ccc;
-                font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
-                white-space: pre-wrap;
-            ">{html}</div>
+            # 统一设置基础样式，减小行高和段落间距
+            styled_html = f"""
             <style>
-                /* 标题样式 */
-                h1 {{ color: #FF9800; margin: 20px 0 15px 0; font-size: 1.3em; }}
-                h2 {{ color: #2196F3; margin: 15px 0 10px 0; font-size: 1.2em; }}
-                h3 {{ color: #4CAF50; margin: 10px 0 5px 0; font-size: 1.1em; }}
+                /* 基础样式 */
+                .md-content, .md-content p, .md-content li {{
+                    line-height: {self.line_height} !important; /* 统一并强制行高 */
+                    margin-top: 2px !important;
+                    margin-bottom: 2px !important;
+                }}
+                .md-content {{
+                    color: #ccc;
+                    font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+                    white-space: pre-wrap;
+                }}
 
-                                /* 列表样式 */
+                /* 标题样式 */
+                h1 {{ color: #FF9800; margin: 12px 0 8px 0; font-size: 1.3em; }}
+                h2 {{ color: #2196F3; margin: 10px 0 6px 0; font-size: 1.2em; }}
+                h3 {{ color: #4CAF50; margin: 10px 0 6px 0; font-size: 1.1em; }}
+
+                /* 列表样式 */
                 ul, ol {{
                     margin: 6px 0;
                     padding-left: 20px;
-                    line-height: 1.5;
-                    font-family: inherit;
                 }}
                 li {{
-                    margin: 4px 0;
-                    line-height: 1.5;
                     vertical-align: baseline;
                     display: list-item;
-                    font-family: inherit;
                     text-align: left;
                 }}
 
@@ -433,8 +438,8 @@ class FeedbackUI(QMainWindow):
                     border-left: 4px solid #2196F3;
                 }}
 
-                /* 段落样式 */
-                p {{ margin: 4px 0; }}
+                /* 段落样式 - 已在 .md-content p 中处理 */
+                p {{ }}
 
                 /* 强调样式 */
                 strong {{ color: #FFD54F; }}
@@ -464,7 +469,9 @@ class FeedbackUI(QMainWindow):
                     background-color: rgba(255,255,255,0.1);
                     font-weight: bold;
                 }}
-            </style>"""
+            </style>
+            <div class="md-content">{html}</div>
+            """
 
             return styled_html
 
@@ -486,48 +493,7 @@ class FeedbackUI(QMainWindow):
 
         # Description text area (from self.prompt) - Support multiline, selectable and copyable with markdown support
         self.description_text = QTextBrowser()
-
-        # 如果是从命令行参数传入的文本，可能需要特殊处理
-        if isinstance(self.prompt, str) and self.prompt.startswith('"') and self.prompt.endswith('"'):
-            # 去除引号
-            self.prompt = self.prompt[1:-1]
-
-        try:
-            # 尝试检测并处理Markdown
-            is_markdown = self._is_markdown(self.prompt)
-
-            # 记录日志，帮助调试
-            print(f"检测到文本类型: {'Markdown' if is_markdown else '普通文本'}")
-
-            if is_markdown:
-                # 尝试使用Markdown库渲染
-                try:
-                    import markdown
-                    self.description_text.setHtml(self._convert_markdown_to_html(self.prompt))
-                    print("使用Markdown库渲染成功")
-                except ImportError:
-                    print("未找到Markdown库，回退到普通文本渲染")
-                    self.description_text.setHtml(self._convert_text_to_html(self.prompt))
-                except Exception as e:
-                    print(f"Markdown渲染失败: {e}，回退到普通文本渲染")
-                    self.description_text.setHtml(self._convert_text_to_html(self.prompt))
-            else:
-                # 使用普通文本渲染
-                self.description_text.setHtml(self._convert_text_to_html(self.prompt))
-                print("使用普通文本渲染")
-        except Exception as e:
-            # 如果出现任何错误，回退到最基本的文本显示
-            print(f"文本处理过程中出现错误: {e}")
-
-            # 尝试直接将转义字符转换为实际字符后设置为纯文本
-            try:
-                processed_text = self._preprocess_text(self.prompt)
-                self.description_text.setPlainText(processed_text)
-                print("使用纯文本显示（预处理后）")
-            except:
-                # 最后的回退方案
-                self.description_text.setPlainText(self.prompt)
-                print("使用纯文本显示（原始文本）")
+        self._update_description_text()  # 调用新方法来设置内容
 
         # QTextBrowser 默认就是只读的，支持选择和复制
         self.description_text.setMaximumHeight(600)  # 设置最大高度，防止按钮溢出屏幕
@@ -718,7 +684,15 @@ class FeedbackUI(QMainWindow):
         layout.addWidget(self.feedback_text)
         layout.addLayout(button_layout)
         # 增加一行文本 ： by rowanyang 居中显示，允许选中和复制文本
-        by_rowanyang_label = QLabel("支持 CMD+/- 缩放字体  Contact: RowanYang")
+        if sys.platform == "darwin":  # macOS
+            zoom_shortcut_text = "CMD+/-"
+            line_height_shortcut_text = "CMD+OPT+H"
+        else:  # Windows, Linux, etc.
+            zoom_shortcut_text = "CTRL+/-"
+            line_height_shortcut_text = "CTRL+ALT+H"
+
+        label_text = f"支持 {zoom_shortcut_text} 缩放字体，{line_height_shortcut_text} 调整行高(5档循环)  Contact: RowanYang"
+        by_rowanyang_label = QLabel(label_text)
         by_rowanyang_label.setStyleSheet(""" color: gray; font-size: 10pt; font-family:"PingFang SC", "Hiragino Sans GB", sans-serif; """)
         by_rowanyang_label.setTextInteractionFlags(Qt.TextSelectableByMouse) # Allow text selection
 
@@ -744,6 +718,66 @@ class FeedbackUI(QMainWindow):
         reset_font = QShortcut(QKeySequence("Ctrl+0"), self)
         reset_font.activated.connect(self.reset_font_size)
 
+        # 切换行高: 根据平台设置不同的快捷键
+        if sys.platform == "darwin":  # macOS
+            key_sequence = "Cmd+Option+H"
+        else:  # Windows, Linux, etc.
+            key_sequence = "Ctrl+Alt+H"
+        toggle_line_height_shortcut = QShortcut(QKeySequence(key_sequence), self)
+        toggle_line_height_shortcut.activated.connect(self._toggle_line_height)
+
+    def _update_description_text(self):
+        """根据当前设置更新描述文本区域的内容和样式"""
+        # 如果是从命令行参数传入的文本，可能需要特殊处理
+        prompt = self.prompt
+        if isinstance(prompt, str) and prompt.startswith('"') and prompt.endswith('"'):
+            # 去除引号
+            prompt = prompt[1:-1]
+
+        try:
+            # 尝试检测并处理Markdown
+            is_markdown = self._is_markdown(prompt)
+
+            # 记录日志，帮助调试
+            print(f"检测到文本类型: {'Markdown' if is_markdown else '普通文本'}")
+
+            if is_markdown:
+                html_content = self._convert_markdown_to_html(prompt)
+            else:
+                html_content = self._convert_text_to_html(prompt)
+            
+            self.description_text.setHtml(html_content)
+
+        except Exception as e:
+            # 如果出现任何错误，回退到最基本的文本显示
+            print(f"文本处理过程中出现错误: {e}")
+
+            # 尝试直接将转义字符转换为实际字符后设置为纯文本
+            try:
+                processed_text = self._preprocess_text(prompt)
+                self.description_text.setPlainText(processed_text)
+                print("使用纯文本显示（预处理后）")
+            except:
+                # 最后的回退方案
+                self.description_text.setPlainText(prompt)
+                print("使用纯文本显示（原始文本）")
+
+    def _toggle_line_height(self):
+        """循环切换行高并更新UI"""
+        line_heights = [1.0, 1.1, 1.2, 1.3, 1.4]
+        try:
+            # 找到当前行高在列表中的位置
+            current_index = line_heights.index(self.line_height)
+            next_index = (current_index + 1) % len(line_heights)
+        except ValueError:
+            # 如果当前值不在预设列表中，则从默认值 1.4 开始
+            next_index = 1  # 对应 1.4
+
+        self.line_height = line_heights[next_index]
+        self._save_line_height(self.line_height)
+        self._update_description_text()
+        print(f"行高已切换为: {self.line_height}")
+
     def adjust_font_size(self, factor: float):
         """按比例调整所有字体大小"""
         app = QApplication.instance()
@@ -766,16 +800,29 @@ class FeedbackUI(QMainWindow):
 
     def _save_font_size(self, size: int):
         """保存字体大小到设置"""
-        self.settings.beginGroup("FontSettings")
+        self.settings.beginGroup("AppearanceSettings")
         self.settings.setValue("fontSize", size)
         self.settings.endGroup()
 
     def _load_font_size(self) -> int:
         """从设置加载字体大小，如果没有则返回默认值"""
-        self.settings.beginGroup("FontSettings")
+        self.settings.beginGroup("AppearanceSettings")
         size = self.settings.value("fontSize", 15, type=int)  # 默认15pt
         self.settings.endGroup()
         return size
+
+    def _save_line_height(self, line_height: float):
+        """保存行高到设置"""
+        self.settings.beginGroup("AppearanceSettings")
+        self.settings.setValue("lineHeight", line_height)
+        self.settings.endGroup()
+
+    def _load_line_height(self) -> float:
+        """从设置加载行高，如果没有则返回默认值"""
+        self.settings.beginGroup("AppearanceSettings")
+        line_height = self.settings.value("lineHeight", 1.3, type=float)
+        self.settings.endGroup()
+        return line_height
 
     def _update_all_fonts(self):
         """更新UI中所有控件的字体"""
