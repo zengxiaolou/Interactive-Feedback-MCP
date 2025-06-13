@@ -25,6 +25,7 @@ from ..utils.config_manager import global_config_manager, ThemeManager, ThemeTyp
 from ..components.data_visualization import DataVisualizationWidget, FeedbackData
 from ..utils.performance import global_performance_monitor, global_response_tracker
 from ..utils.responsive import ScreenSizeManager, responsive_manager
+from ..resources.icon_manager import icon_manager
 
 class FeedbackResult(TypedDict):
     interactive_feedback: str
@@ -70,13 +71,15 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _setup_window(self):
         """设置窗口基本属性"""
-        self.setWindowTitle("Interactive Feedback MCP | admin - Enhanced Context")
+        self.setWindowTitle("🎯 Interactive Feedback MCP - Enhanced Context")
         
-        # 设置图标
-        script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        icon_path = os.path.join(script_dir, "images", "feedback.png")
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
+        # 设置应用图标
+        if icon_manager.is_available():
+            app_icon = icon_manager.get_app_icon()
+            self.setWindowIcon(app_icon)
+            print("✅ 应用图标已加载")
+        else:
+            print("⚠️ 应用图标不可用，使用默认图标")
         
         # 设置窗口属性
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
