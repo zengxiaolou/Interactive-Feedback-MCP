@@ -4,6 +4,7 @@
 import os
 import sys
 import subprocess
+import time
 from typing import Optional, List, TypedDict
 
 from PySide6.QtWidgets import (
@@ -17,7 +18,13 @@ from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFont
 from ..widgets.feedback_text_edit import FeedbackTextEdit
 from ..styles.glassmorphism import GlassmorphismStyles
 from ..styles.modern_glassmorphism import ModernGlassmorphismTheme
+from ..styles.enhanced_glassmorphism import EnhancedGlassmorphismTheme
 from ..components.text_processing import TextProcessor
+# 集成配置管理和数据可视化
+from ..utils.config_manager import global_config_manager, ThemeManager, ThemeType
+from ..components.data_visualization import DataVisualizationWidget, FeedbackData
+from ..utils.performance import global_performance_monitor, global_response_tracker
+from ..utils.responsive import ScreenSizeManager, responsive_manager
 
 class FeedbackResult(TypedDict):
     interactive_feedback: str
@@ -39,10 +46,27 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.project_info = self._get_project_info()
         self.git_info = self._get_git_info()
         
+        # 集成配置管理和数据可视化
+        self.config_manager = global_config_manager
+        self.data_visualization = None  # 按需创建
+        
+        # 性能监控
+        global_performance_monitor.start_monitoring()
+        start_time = time.time()
+        
         self._setup_window()
         self._load_settings()
         self._create_ui()
         self._setup_shortcuts()
+        self._setup_config_integration()
+        self._apply_saved_config()
+        
+        # 检查启动性能 (PRD要求: <2s)
+        startup_time = time.time() - start_time
+        if startup_time > 2.0:
+            print(f"⚠️ 启动时间超标: {startup_time:.2f}s (目标: <2s)")
+        else:
+            print(f"✅ 启动性能达标: {startup_time:.2f}s")
 
     def _setup_window(self):
         """设置窗口基本属性"""
@@ -59,21 +83,21 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowOpacity(0.95)
         
-        # 应用现代化毛玻璃主窗口样式
-        self.setStyleSheet(ModernGlassmorphismTheme.get_main_window_style())
+        # 应用增强版毛玻璃主窗口样式
+        self.setStyleSheet(EnhancedGlassmorphismTheme.get_main_window_style())
 
     def _load_settings(self):
         """加载设置"""
         self.settings = QSettings("InteractiveFeedbackMCP", "InteractiveFeedbackMCP")
         self.line_height = self._load_line_height()
         
-        # 设置窗口大小和位置 - 参考enhanced_feedback_ui的尺寸
+        # 设置窗口大小和位置 - 调整为更高的窗口
         screen = QApplication.primaryScreen().geometry()
-        window_height = min(1200, int(screen.height() * 0.85))  # 最大1200高度
-        window_width = min(1600, int(screen.width() * 0.85))   # 最大1600宽度
+        window_height = min(1200, int(screen.height() * 0.85))  # 增加高度到1200
+        window_width = min(1400, int(screen.width() * 0.80))   # 保持宽度1400
         
         self.resize(window_width, window_height)
-        self.setMinimumSize(1200, 800)  # 参考UI的最小尺寸
+        self.setMinimumSize(1000, 800)  # 最小高度也增加到800
         
         # 窗口居中
         x = (screen.width() - window_width) // 2
@@ -86,111 +110,97 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.setCentralWidget(central_widget)
         # 中央widget使用透明背景，由主窗口提供背景
         
-        # 主布局 - 参考enhanced_feedback_ui的水平布局
+        # 主布局 - 使用QSplitter实现可调整的三栏布局
+        main_splitter = QSplitter(Qt.Horizontal, central_widget)
+        main_splitter.setStyleSheet(EnhancedGlassmorphismTheme.get_splitter_style())
+        
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(5, 5, 5, 5)  # 参考UI的边距
-        main_layout.setSpacing(5)  # 参考UI的间距
+        main_layout.setContentsMargins(8, 8, 8, 8)  # PRD: 基础间距8px
+        main_layout.addWidget(main_splitter)
         
         # 创建三个栏目
-        left_panel = self._create_left_panel()    # 消息内容
-        center_panel = self._create_center_panel() # 智能推荐选项
-        right_panel = self._create_right_panel()   # 项目信息
+        left_panel = self._create_left_panel()    # 消息内容 (40%)
+        center_panel = self._create_center_panel() # 智能推荐选项 (40%)
+        right_panel = self._create_right_panel()   # 项目信息 (20%)
         
-        # 按照参考UI的比例：左侧占2份，中间占2份，右侧占1份
-        main_layout.addWidget(left_panel, 2)
-        main_layout.addWidget(center_panel, 2)
-        main_layout.addWidget(right_panel, 1)
+        # 添加面板到分割器
+        main_splitter.addWidget(left_panel)
+        main_splitter.addWidget(center_panel)
+        main_splitter.addWidget(right_panel)
+        
+        # 设置PRD文档中定义的比例：左侧40%，中间40%，右侧20%
+        main_splitter.setSizes([400, 400, 200])  # 相对比例
+        main_splitter.setCollapsible(0, False)  # 左侧面板不可折叠
+        main_splitter.setCollapsible(1, False)  # 中间面板不可折叠
+        main_splitter.setCollapsible(2, True)   # 右侧面板可折叠
 
     def _create_left_panel(self):
-        """创建左侧消息内容面板"""
+        """创建左侧消息内容面板 - 增强版毛玻璃效果"""
         panel = QFrame()
-        panel.setStyleSheet(ModernGlassmorphismTheme.get_panel_style())
+        panel.setStyleSheet(EnhancedGlassmorphismTheme.get_panel_style())
         
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(12, 12, 12, 12)  # PRD: 组件间距12px
+        layout.setSpacing(12)
         
-        # 标题 - 使用现代化样式
+        # 标题 - 使用增强版样式
         title = QLabel("💬 消息内容")
-        title.setStyleSheet(ModernGlassmorphismTheme.get_title_style('#4CAF50'))
+        title.setStyleSheet(EnhancedGlassmorphismTheme.get_title_style('#4CAF50'))
         layout.addWidget(title)
         
-        # 消息文本区域 - 使用现代化样式
+        # 消息文本区域 - 使用增强版样式
         self.description_text = QTextBrowser()
-        self.description_text.setStyleSheet(ModernGlassmorphismTheme.get_text_browser_style())
-        self.description_text.setMaximumHeight(400)
+        self.description_text.setStyleSheet(EnhancedGlassmorphismTheme.get_text_browser_style())
+        self.description_text.setMaximumHeight(450)  # 增加高度到450
         self._update_description_text()
         layout.addWidget(self.description_text)
         
-        # 布局改进建议
-        layout_label = QLabel("🎨 布局行为改进")
-        layout_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 10px;")
-        layout.addWidget(layout_label)
-        
-        layout_improvements = QTextBrowser()
-        layout_improvements.setStyleSheet(GlassmorphismStyles.text_browser())
-        layout_improvements.setMaximumHeight(200)
-        layout_improvements.setHtml(self._get_layout_improvements())
-        layout.addWidget(layout_improvements)
-        
-        # 项目上下文
-        context_label = QLabel("📁 项目上下文 (已更新)")
-        context_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 10px;")
+        # 项目上下文信息 - 简化布局
+        context_label = QLabel("📁 项目上下文")
+        context_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#4CAF50', 'large'))
         layout.addWidget(context_label)
         
         context_text = QTextBrowser()
-        context_text.setStyleSheet(GlassmorphismStyles.text_browser())
-        context_text.setMaximumHeight(150)
-        context_text.setHtml(self._get_project_context())
+        context_text.setStyleSheet(EnhancedGlassmorphismTheme.get_text_browser_style())
+        context_text.setMaximumHeight(250)  # 增加高度到250
+        context_text.setHtml(self._get_enhanced_project_context())
         layout.addWidget(context_text)
         
         layout.addStretch()
         return panel
 
     def _create_center_panel(self):
-        """创建中间智能推荐选项面板"""
+        """创建中间智能推荐选项面板 - 增强版毛玻璃效果"""
         panel = QFrame()
-        panel.setStyleSheet(ModernGlassmorphismTheme.get_panel_style())
+        panel.setStyleSheet(EnhancedGlassmorphismTheme.get_panel_style())
         
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(12, 12, 12, 12)  # PRD: 组件间距12px
+        layout.setSpacing(12)
         
-        # 标题 - 使用现代化样式
-        title = QLabel("🎯 选择操作")
-        title.setStyleSheet(ModernGlassmorphismTheme.get_title_style('#FF9800'))
+        # 标题 - 使用增强版样式
+        title = QLabel("🎯 智能推荐选项")
+        title.setStyleSheet(EnhancedGlassmorphismTheme.get_title_style('#FF9800'))
         layout.addWidget(title)
         
-        # 创建选项列表
+        # 创建选项列表 - 使用增强版样式
         self.option_checkboxes = []
         if self.predefined_options:
             for i, option in enumerate(self.predefined_options, 1):
                 checkbox_frame = QFrame()
-                checkbox_frame.setStyleSheet("""
-                    QFrame {
-                        background: rgba(255, 255, 255, 0.03);
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        border-radius: 6px;
-                        padding: 8px;
-                        margin: 2px 0px;
-                    }
-                    QFrame:hover {
-                        background: rgba(255, 255, 255, 0.06);
-                        border: 1px solid rgba(33, 150, 243, 0.3);
-                    }
-                """)
+                checkbox_frame.setStyleSheet(EnhancedGlassmorphismTheme.get_checkbox_frame_style())
                 
                 checkbox_layout = QHBoxLayout(checkbox_frame)
-                checkbox_layout.setContentsMargins(8, 5, 8, 5)
+                checkbox_layout.setContentsMargins(10, 8, 10, 8)  # PRD: 优化内边距
                 
                 # 序号标签
                 number_label = QLabel(f"{i}.")
-                number_label.setStyleSheet("color: #2196F3; font-weight: bold; font-size: 12px;")
-                number_label.setFixedWidth(20)
+                number_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#2196F3', 'small'))
+                number_label.setFixedWidth(25)
                 
-                # 复选框 - 使用现代化样式
+                # 复选框 - 使用增强版样式
                 checkbox = QCheckBox(option)
-                checkbox.setStyleSheet(ModernGlassmorphismTheme.get_checkbox_style())
+                checkbox.setStyleSheet(EnhancedGlassmorphismTheme.get_checkbox_style())
                 
                 checkbox_layout.addWidget(number_label)
                 checkbox_layout.addWidget(checkbox)
@@ -252,17 +262,17 @@ class ThreeColumnFeedbackUI(QMainWindow):
         return panel
 
     def _create_right_panel(self):
-        """创建右侧项目信息面板"""
+        """创建右侧项目信息面板 - 增强版毛玻璃效果"""
         panel = QFrame()
-        panel.setStyleSheet(ModernGlassmorphismTheme.get_panel_style())
+        panel.setStyleSheet(EnhancedGlassmorphismTheme.get_panel_style())
         
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(12, 12, 12, 12)  # PRD: 组件间距12px
+        layout.setSpacing(12)
         
-        # 标题 - 使用现代化样式
-        title = QLabel("🏗️ 项目上下文")
-        title.setStyleSheet(ModernGlassmorphismTheme.get_title_style('#2196F3'))
+        # 标题 - 使用增强版样式
+        title = QLabel("🏗️ 项目信息")
+        title.setStyleSheet(EnhancedGlassmorphismTheme.get_title_style('#2196F3'))
         layout.addWidget(title)
         
         # 项目基础信息
@@ -279,14 +289,42 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         return panel
 
+    def _add_custom_input_section(self, layout):
+        """添加自定义输入部分"""
+        input_label = QLabel("✏️ 自定义输入")
+        input_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 15px;")
+        layout.addWidget(input_label)
+        
+        # 自定义文本输入 - 使用增强版样式
+        self.custom_input = FeedbackTextEdit()
+        self.custom_input.setStyleSheet(EnhancedGlassmorphismTheme.get_text_edit_style())
+        self.custom_input.setMaximumHeight(120)  # 增加输入框高度
+        self.custom_input.setPlaceholderText("输入自定义文本或反馈，支持粘贴图片/链接 | Ctrl+Enter发送")
+        layout.addWidget(self.custom_input)
+        
+        # 按钮区域 - 使用增强版样式
+        button_layout = QHBoxLayout()
+        
+        submit_btn = QPushButton("✅ 提交 (Ctrl+ENTER)")
+        submit_btn.setStyleSheet(EnhancedGlassmorphismTheme.get_button_style('secondary'))
+        submit_btn.clicked.connect(self._submit_feedback)
+        
+        cancel_btn = QPushButton("❌ 取消")
+        cancel_btn.setStyleSheet(EnhancedGlassmorphismTheme.get_button_style('error'))
+        cancel_btn.clicked.connect(self.close)
+        
+        button_layout.addWidget(submit_btn)
+        button_layout.addWidget(cancel_btn)
+        layout.addLayout(button_layout)
+
     def _add_project_info_section(self, layout):
-        """添加项目基础信息部分"""
+        """添加项目基础信息部分 - 增强版样式"""
         info_label = QLabel("🏗️ 项目基础")
-        info_label.setStyleSheet("color: #2196F3; font-weight: bold; font-size: 13px;")
+        info_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#2196F3', 'large'))
         layout.addWidget(info_label)
         
         info_frame = QFrame()
-        info_frame.setStyleSheet(ModernGlassmorphismTheme.get_info_section_style())
+        info_frame.setStyleSheet(EnhancedGlassmorphismTheme.get_info_section_style())
         
         info_layout = QVBoxLayout(info_frame)
         info_layout.setSpacing(5)
@@ -400,67 +438,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         layout.addWidget(activity_frame)
 
-    def _add_custom_input_section(self, layout):
-        """添加自定义输入部分"""
-        input_label = QLabel("✏️ 自定义输入")
-        input_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 15px;")
-        layout.addWidget(input_label)
-        
-        # 自定义文本输入
-        self.custom_input = FeedbackTextEdit()
-        self.custom_input.setStyleSheet(GlassmorphismStyles.text_edit())
-        self.custom_input.setMaximumHeight(100)
-        self.custom_input.setPlaceholderText("输入自定义文本或反馈，支持粘贴图片/链接 | Shift+Enter换行")
-        layout.addWidget(self.custom_input)
-        
-        # 按钮区域
-        button_layout = QHBoxLayout()
-        
-        submit_btn = QPushButton("✅ 提交 (ENTER)")
-        submit_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(76, 175, 80, 0.8),
-                    stop:1 rgba(56, 142, 60, 0.8));
-                color: white;
-                border: 1px solid rgba(76, 175, 80, 0.6);
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(76, 175, 80, 0.9),
-                    stop:1 rgba(56, 142, 60, 0.9));
-            }
-        """)
-        submit_btn.clicked.connect(self._submit_feedback)
-        
-        cancel_btn = QPushButton("❌ 取消")
-        cancel_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(244, 67, 54, 0.8),
-                    stop:1 rgba(198, 40, 40, 0.8));
-                color: white;
-                border: 1px solid rgba(244, 67, 54, 0.6);
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(244, 67, 54, 0.9),
-                    stop:1 rgba(198, 40, 40, 0.9));
-            }
-        """)
-        cancel_btn.clicked.connect(self.close)
-        
-        button_layout.addWidget(submit_btn)
-        button_layout.addWidget(cancel_btn)
-        layout.addLayout(button_layout)
+
 
     def _get_layout_improvements(self):
         """获取布局改进建议"""
@@ -484,15 +462,20 @@ class ThreeColumnFeedbackUI(QMainWindow):
         </div>
         """
 
-    def _get_project_context(self):
-        """获取项目上下文信息"""
-        return """
-        <div style="color: #ccc; font-size: 12px; line-height: 1.4;">
-        <p><strong style="color: #4CAF50;">📁 项目名称:</strong> admin (管理后台项目)</p>
-        <p><strong style="color: #4CAF50;">🔧 配置状态:</strong> 无需安装依赖或动态配置</p>
-        <p><strong style="color: #4CAF50;">📍 在用户目录:</strong> 创建或复制相关网格布局对齐</p>
-        <p><strong style="color: #4CAF50;">🎯 按钮尺寸:</strong> 100px × 自适应高度</p>
-        <p><strong style="color: #4CAF50;">🎨 解决方案:</strong> 严格定义网格布局和网格布局</p>
+    def _get_enhanced_project_context(self):
+        """获取增强版项目上下文信息"""
+        project_info = self._get_project_info()
+        git_info = self._get_git_info()
+        
+        return f"""
+        <div style="color: #ccc; font-size: 13px; line-height: 1.6; padding: 8px;">
+        <p><strong style="color: #4CAF50;">📁 项目名称:</strong> {project_info.get('name', 'unknown')}</p>
+        <p><strong style="color: #4CAF50;">📍 项目路径:</strong> {project_info.get('path', 'unknown')}</p>
+        <p><strong style="color: #4CAF50;">📊 文件数量:</strong> {project_info.get('files', 0)} 个文件</p>
+        <p><strong style="color: #2196F3;">🌿 Git分支:</strong> {git_info.get('branch', 'unknown')}</p>
+        <p><strong style="color: #FF9800;">📝 修改文件:</strong> {git_info.get('modified_files', 0)} 个</p>
+        <p><strong style="color: #9C27B0;">🎯 UI主题:</strong> 增强版毛玻璃效果</p>
+        <p><strong style="color: #607D8B;">⚡ 性能:</strong> 优化响应速度 < 100ms</p>
         </div>
         """
 
@@ -535,7 +518,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
             return {"branch": "unknown", "modified_files": 0, "last_commit": "unknown"}
 
     def _setup_shortcuts(self):
-        """设置快捷键"""
+        """设置快捷键 - 根据PRD文档增强"""
         # 字体缩放快捷键
         zoom_in = QShortcut(QKeySequence("Ctrl+="), self)
         zoom_in.activated.connect(lambda: self.adjust_font_size(1.1))
@@ -545,6 +528,228 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
         reset_font = QShortcut(QKeySequence("Ctrl+0"), self)
         reset_font.activated.connect(self.reset_font_size)
+        
+        # PRD文档中定义的快捷键
+        # Enter: 提交反馈
+        submit_shortcut = QShortcut(QKeySequence("Return"), self)
+        submit_shortcut.activated.connect(self._submit_feedback)
+        
+        # Esc: 取消/关闭
+        cancel_shortcut = QShortcut(QKeySequence("Escape"), self)
+        cancel_shortcut.activated.connect(self.close)
+        
+        # Ctrl+1-9: 快速选择选项
+        for i in range(1, min(10, len(self.option_checkboxes) + 1)):
+            shortcut = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
+            shortcut.activated.connect(lambda checked, idx=i-1: self._toggle_option(idx))
+        
+        # Ctrl+/: 显示帮助（暂时显示快捷键信息）
+        help_shortcut = QShortcut(QKeySequence("Ctrl+/"), self)
+        help_shortcut.activated.connect(self._show_help)
+    
+    def _setup_config_integration(self):
+        """设置配置管理集成"""
+        # 连接配置变更信号
+        self.config_manager.theme_changed.connect(self._on_theme_changed)
+        self.config_manager.config_changed.connect(self._on_config_changed)
+        
+        # 添加配置相关的快捷键
+        config_shortcuts = [
+            ("Ctrl+T", "切换主题", self._toggle_theme),
+            ("Ctrl+D", "显示数据分析", self._show_data_visualization),
+            ("Ctrl+E", "导出配置", self._export_config),
+            ("Ctrl+I", "导入配置", self._import_config),
+            ("Ctrl+R", "重置配置", self._reset_config)
+        ]
+        
+        for shortcut, description, callback in config_shortcuts:
+            shortcut_obj = QShortcut(QKeySequence(shortcut), self)
+            shortcut_obj.activated.connect(callback)
+            print(f"🔧 已注册快捷键: {shortcut} - {description}")
+    
+    def _apply_saved_config(self):
+        """应用保存的配置"""
+        config = self.config_manager.config
+        
+        # 应用窗口尺寸
+        self.resize(config.ui.window_width, config.ui.window_height)
+        
+        # 应用主题
+        theme_type = ThemeType(config.ui.theme)
+        ThemeManager.apply_theme(self, theme_type)
+        
+        # 应用字体设置
+        if hasattr(QApplication.instance(), 'setFont'):
+            font = QApplication.instance().font()
+            font.setPointSize(config.ui.font_size)
+            font.setFamily(config.ui.font_family)
+            QApplication.instance().setFont(font)
+        
+        print(f"✅ 已应用配置: 主题={config.ui.theme}, 字体={config.ui.font_size}px")
+    
+    def _on_theme_changed(self, theme_name: str):
+        """主题变更处理"""
+        theme_type = ThemeType(theme_name)
+        ThemeManager.apply_theme(self, theme_type)
+        print(f"🎨 主题已切换: {theme_name}")
+    
+    def _on_config_changed(self, config_type: str, value):
+        """配置变更处理"""
+        if config_type == "window_size":
+            width, height = value
+            self.resize(width, height)
+        elif config_type == "font_size":
+            # 字体大小已在config_manager中处理
+            pass
+        elif config_type == "panel_ratios":
+            # 重新调整面板比例
+            self._adjust_panel_ratios(value)
+        
+        print(f"⚙️ 配置已更新: {config_type} = {value}")
+    
+    def _adjust_panel_ratios(self, ratios: List[int]):
+        """调整面板比例"""
+        if hasattr(self, 'splitter') and len(ratios) == 3:
+            total_width = self.width()
+            sizes = [int(total_width * ratio / 100) for ratio in ratios]
+            self.splitter.setSizes(sizes)
+    
+    def _toggle_theme(self):
+        """切换主题"""
+        current_theme = self.config_manager.config.ui.theme
+        available_themes = [
+            ThemeType.ENHANCED_GLASSMORPHISM,
+            ThemeType.MODERN_GLASSMORPHISM,
+            ThemeType.GLASSMORPHISM
+        ]
+        
+        # 找到当前主题的索引
+        current_index = 0
+        for i, theme in enumerate(available_themes):
+            if theme.value == current_theme:
+                current_index = i
+                break
+        
+        # 切换到下一个主题
+        next_index = (current_index + 1) % len(available_themes)
+        next_theme = available_themes[next_index]
+        
+        self.config_manager.set_theme(next_theme)
+    
+    def _show_data_visualization(self):
+        """显示数据可视化"""
+        if self.data_visualization is None:
+            self.data_visualization = DataVisualizationWidget()
+            self.data_visualization.setWindowTitle("📊 Interactive Feedback MCP - 数据分析")
+            
+            # 添加当前反馈数据
+            if hasattr(self, 'feedback_result') and self.feedback_result:
+                feedback_data = self._create_feedback_data_from_result()
+                self.data_visualization.add_feedback_data(feedback_data)
+        
+        self.data_visualization.show()
+        self.data_visualization.raise_()
+        self.data_visualization.activateWindow()
+        print("📊 数据可视化窗口已打开")
+    
+    def _create_feedback_data_from_result(self) -> FeedbackData:
+        """从反馈结果创建数据对象"""
+        from datetime import datetime
+        
+        selected_options = []
+        if hasattr(self, 'feedback_result') and self.feedback_result:
+            if 'interactive_feedback' in self.feedback_result:
+                feedback_text = self.feedback_result['interactive_feedback']
+                # 简单解析选中的选项
+                if hasattr(self, 'predefined_options'):
+                    for option in self.predefined_options:
+                        if option in feedback_text:
+                            selected_options.append(option)
+        
+        return FeedbackData(
+            timestamp=datetime.now(),
+            user_id="current_user",
+            message=getattr(self, 'prompt', ''),
+            selected_options=selected_options,
+            custom_input=self.custom_input.toPlainText() if hasattr(self, 'custom_input') else '',
+            response_time=getattr(self, 'last_response_time', 0.0),
+            satisfaction_score=4,  # 默认满意度
+            category="interactive"
+        )
+    
+    def _export_config(self):
+        """导出配置"""
+        from datetime import datetime
+        filename = f"interactive_feedback_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        success = self.config_manager.export_config(filename)
+        
+        if success:
+            # 在描述区域显示成功消息
+            self.description_text.append(f"\n✅ 配置已导出到: {filename}")
+        else:
+            self.description_text.append(f"\n❌ 配置导出失败")
+    
+    def _import_config(self):
+        """导入配置（简化版，实际应用中可以添加文件选择对话框）"""
+        self.description_text.append(f"\n💡 配置导入功能：请使用 config_manager.import_config(file_path) 方法")
+    
+    def _reset_config(self):
+        """重置配置"""
+        self.config_manager.reset_to_default()
+        self.description_text.append(f"\n🔄 配置已重置为默认值")
+    
+    def _record_feedback_data(self):
+        """记录反馈数据用于分析"""
+        if hasattr(self, 'feedback_result') and self.feedback_result:
+            feedback_data = self._create_feedback_data_from_result()
+            
+            # 如果数据可视化窗口已打开，添加数据
+            if self.data_visualization is not None:
+                self.data_visualization.add_feedback_data(feedback_data)
+            
+            print(f"📝 已记录反馈数据: {len(feedback_data.selected_options)} 个选项")
+    
+    def _save_window_state(self):
+        """保存窗口状态到配置"""
+        self.config_manager.set_window_size(self.width(), self.height())
+        
+        # 保存面板比例
+        if hasattr(self, 'splitter'):
+            sizes = self.splitter.sizes()
+            total = sum(sizes)
+            if total > 0:
+                ratios = [int(size * 100 / total) for size in sizes]
+                # 确保总和为100
+                if sum(ratios) != 100:
+                    ratios[-1] = 100 - sum(ratios[:-1])
+                self.config_manager.set_panel_ratios(ratios)
+    
+    def _toggle_option(self, index):
+        """切换选项状态"""
+        if 0 <= index < len(self.option_checkboxes):
+            checkbox = self.option_checkboxes[index]
+            checkbox.setChecked(not checkbox.isChecked())
+    
+    def _show_help(self):
+        """显示帮助信息"""
+        help_text = """
+        <div style="color: #fff; font-size: 13px; line-height: 1.6; padding: 10px;">
+        <h3 style="color: #2196F3;">🎯 快捷键帮助</h3>
+        <p><strong>Enter:</strong> 提交反馈</p>
+        <p><strong>Shift+Enter:</strong> 在输入框中换行</p>
+        <p><strong>Ctrl+1-9:</strong> 快速选择/取消选项</p>
+        <p><strong>Ctrl+/:</strong> 显示此帮助</p>
+        <p><strong>Esc:</strong> 取消/关闭窗口</p>
+        <p><strong>Ctrl +/-:</strong> 缩放字体</p>
+        <p><strong>Ctrl+0:</strong> 重置字体大小</p>
+        </div>
+        """
+        # 临时在描述区域显示帮助
+        original_html = self.description_text.toHtml()
+        self.description_text.setHtml(help_text)
+        
+        # 3秒后恢复原内容
+        QTimer.singleShot(3000, lambda: self.description_text.setHtml(original_html))
 
     def _update_description_text(self):
         """更新描述文本内容"""
@@ -579,6 +784,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _submit_feedback(self):
         """提交反馈"""
+        start_time = global_response_tracker.start_timing()
+        
         feedback_text = self.custom_input.toPlainText().strip()
         selected_options = []
 
@@ -610,6 +817,24 @@ class ThreeColumnFeedbackUI(QMainWindow):
             interactive_feedback=final_feedback,
             images=images
         )
+        
+        # 记录响应时间
+        response_time = global_response_tracker.end_timing(start_time, "submit_feedback")
+        self.last_response_time = response_time
+        
+        # 记录反馈数据用于分析（需要先设置feedback_result）
+        try:
+            self._record_feedback_data()
+        except Exception as e:
+            print(f"⚠️ 记录反馈数据失败: {e}")
+        
+        # 保存窗口状态到配置
+        self._save_window_state()
+        
+        print(f"✅ 反馈已提交 (响应时间: {response_time:.0f}ms)")
+        print(f"📝 选中选项: {selected_options}")
+        if feedback_text:
+            print(f"💬 自定义输入: {feedback_text}")
         
         self.close()
 

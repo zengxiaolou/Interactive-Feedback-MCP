@@ -22,9 +22,9 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
         output_file = tmp.name
 
     try:
-        # Get the path to feedback_ui_new.py relative to this script
+        # Get the path to enhanced_feedback_ui.py relative to this script
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        feedback_ui_path = os.path.join(script_dir, "feedback_ui_new.py")
+        feedback_ui_path = os.path.join(script_dir, "enhanced_feedback_ui.py")
 
         # Run feedback_ui.py as a separate process
         # NOTE: There appears to be a bug in uv, so we need
