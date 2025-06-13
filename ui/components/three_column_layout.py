@@ -148,14 +148,13 @@ class ThreeColumnFeedbackUI(QMainWindow):
         title.setStyleSheet(EnhancedGlassmorphismTheme.get_title_style('#4CAF50'))
         layout.addWidget(title)
         
-        # 消息文本区域 - 使用增强版样式
+        # 消息文本区域 - 使用增强版样式，占满整个左侧栏
         self.description_text = QTextBrowser()
         self.description_text.setStyleSheet(EnhancedGlassmorphismTheme.get_text_browser_style())
-        self.description_text.setMaximumHeight(450)  # 增加高度到450
+        # 移除固定高度限制，让内容占满整个可用空间
         self._update_description_text()
-        layout.addWidget(self.description_text)
+        layout.addWidget(self.description_text, 1)  # 添加拉伸因子，让文本区域占满剩余空间
         
-        layout.addStretch()
         return panel
 
     def _create_center_panel(self):
@@ -451,22 +450,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         </div>
         """
 
-    def _get_enhanced_project_context(self):
-        """获取增强版项目上下文信息"""
-        project_info = self._get_project_info()
-        git_info = self._get_git_info()
-        
-        return f"""
-        <div style="color: #ccc; font-size: 13px; line-height: 1.6; padding: 8px;">
-        <p><strong style="color: #4CAF50;">📁 项目名称:</strong> {project_info.get('name', 'unknown')}</p>
-        <p><strong style="color: #4CAF50;">📍 项目路径:</strong> {project_info.get('path', 'unknown')}</p>
-        <p><strong style="color: #4CAF50;">📊 文件数量:</strong> {project_info.get('files', 0)} 个文件</p>
-        <p><strong style="color: #2196F3;">🌿 Git分支:</strong> {git_info.get('branch', 'unknown')}</p>
-        <p><strong style="color: #FF9800;">📝 修改文件:</strong> {git_info.get('modified_files', 0)} 个</p>
-        <p><strong style="color: #9C27B0;">🎯 UI主题:</strong> 增强版毛玻璃效果</p>
-        <p><strong style="color: #607D8B;">⚡ 性能:</strong> 优化响应速度 < 100ms</p>
-        </div>
-        """
+
 
     def _get_project_info(self):
         """获取项目基础信息"""
