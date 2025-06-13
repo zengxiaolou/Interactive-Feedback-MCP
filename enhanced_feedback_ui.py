@@ -43,7 +43,6 @@ def main():
     
     # 设置应用程序图标（用于Dock显示）
     from PySide6.QtGui import QIcon
-    import os
     icon_path = os.path.join(os.path.dirname(__file__), "ui", "resources", "icons", "app_icon.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
