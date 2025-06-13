@@ -21,7 +21,7 @@ class IconManager:
         if size is None:
             # 返回多尺寸图标
             icon = QIcon()
-            sizes = [16, 32, 48, 64, 128, 256, 512]
+            sizes = [16, 32, 48, 64, 128, 256, 512, 1024]
             for s in sizes:
                 icon_path = os.path.join(self.icons_dir, f"app_icon_{s}.png")
                 if os.path.exists(icon_path):

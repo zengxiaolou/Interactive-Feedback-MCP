@@ -18,28 +18,36 @@ class IconGenerator:
         
     def create_app_icon(self, size: int = 256) -> QPixmap:
         """创建应用主图标"""
-        pixmap = QPixmap(size, size)
+        # 为高DPI屏幕创建2倍分辨率的图标
+        actual_size = size * 2
+        pixmap = QPixmap(actual_size, actual_size)
         pixmap.fill(Qt.transparent)
         
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
         
         # 创建渐变背景
-        gradient = QLinearGradient(0, 0, size, size)
+        gradient = QLinearGradient(0, 0, actual_size, actual_size)
         gradient.setColorAt(0, self.base_color)
         gradient.setColorAt(1, self.accent_color)
         
         # 绘制圆形背景
         painter.setBrush(QBrush(gradient))
         painter.setPen(Qt.NoPen)
-        margin = size * 0.05
+        margin = actual_size * 0.05
         painter.drawEllipse(int(margin), int(margin), 
-                          int(size - 2 * margin), int(size - 2 * margin))
+                          int(actual_size - 2 * margin), int(actual_size - 2 * margin))
         
         # 绘制对话框图标
-        self._draw_feedback_icon(painter, size)
+        self._draw_feedback_icon(painter, actual_size)
         
         painter.end()
+        
+        # 缩放到目标尺寸，保持高质量
+        if actual_size != size:
+            pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        
         return pixmap
     
     def _draw_feedback_icon(self, painter: QPainter, size: int):
@@ -115,8 +123,8 @@ class IconGenerator:
         """保存不同尺寸的图标"""
         os.makedirs(output_dir, exist_ok=True)
         
-        # 应用图标 - 不同尺寸
-        sizes = [16, 32, 48, 64, 128, 256, 512]
+        # 应用图标 - 不同尺寸，包含macOS Dock需要的高分辨率版本
+        sizes = [16, 32, 48, 64, 128, 256, 512, 1024]
         for size in sizes:
             icon = self.create_app_icon(size)
             icon.save(os.path.join(output_dir, f"app_icon_{size}.png"))
