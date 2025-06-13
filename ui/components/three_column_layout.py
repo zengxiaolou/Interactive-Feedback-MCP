@@ -325,7 +325,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
                 padding: 5px;
             }
         """)
-        self.images_container.setFixedHeight(90)  # 包含边距的总高度
+        self.images_container.setFixedHeight(120)  # 增加高度到120px
         self.images_container.setVisible(False)  # 默认隐藏
         
         # 图片预览标题
@@ -356,7 +356,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.images_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.images_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.images_scroll_area.setWidgetResizable(True)
-        self.images_scroll_area.setFixedHeight(70)  # 图片显示区域高度
+        self.images_scroll_area.setFixedHeight(95)  # 增加图片显示区域高度
         
         # 图片容器widget
         images_widget = QWidget()
@@ -391,7 +391,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         original_height = pixmap.height()
         
         # 固定高度，保持宽高比
-        target_height = 60  # 预览图片高度
+        target_height = 80  # 增加预览图片高度
         scaled_width = int(original_width * (target_height / original_height))
         
         # 创建图片容器帧
@@ -450,15 +450,15 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         # 删除按钮
         delete_button = QPushButton("×")
-        delete_button.setFixedSize(16, 16)
+        delete_button.setFixedSize(20, 20)
         delete_button.setCursor(Qt.PointingHandCursor)
         delete_button.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 0, 0, 0.7);
                 color: white;
-                border-radius: 8px;
+                border-radius: 10px;
                 font-weight: bold;
-                font-size: 10px;
+                font-size: 12px;
                 border: none;
             }
             QPushButton:hover {
