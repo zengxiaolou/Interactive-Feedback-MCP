@@ -20,6 +20,7 @@ from ..styles.glassmorphism import GlassmorphismStyles
 from ..styles.modern_glassmorphism import ModernGlassmorphismTheme
 from ..styles.enhanced_glassmorphism import EnhancedGlassmorphismTheme
 from ..components.text_processing import TextProcessor
+from ..components.enhanced_markdown_renderer import EnhancedTextBrowser
 # 集成配置管理和数据可视化
 from ..utils.config_manager import global_config_manager, ThemeManager, ThemeType
 from ..components.data_visualization import DataVisualizationWidget, FeedbackData
@@ -131,8 +132,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
         main_splitter.addWidget(center_panel)
         main_splitter.addWidget(right_panel)
         
-        # 设置PRD文档中定义的比例：左侧40%，中间40%，右侧20%
-        main_splitter.setSizes([400, 400, 200])  # 相对比例
+        # 调整比例：左侧增加1/3，从40%增加到53%，中间减少到27%，右侧保持20%
+        main_splitter.setSizes([530, 270, 200])  # 相对比例：53% + 27% + 20% = 100%
         main_splitter.setCollapsible(0, False)  # 左侧面板不可折叠
         main_splitter.setCollapsible(1, False)  # 中间面板不可折叠
         main_splitter.setCollapsible(2, True)   # 右侧面板可折叠
@@ -151,8 +152,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
         title.setStyleSheet(EnhancedGlassmorphismTheme.get_title_style('#4CAF50'))
         layout.addWidget(title)
         
-        # 消息文本区域 - 使用增强版样式，占满整个左侧栏
-        self.description_text = QTextBrowser()
+        # 消息文本区域 - 使用增强版markdown渲染器
+        self.description_text = EnhancedTextBrowser()
         self.description_text.setStyleSheet(EnhancedGlassmorphismTheme.get_text_browser_style())
         # 移除固定高度限制，让内容占满整个可用空间
         self._update_description_text()
@@ -940,12 +941,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _update_description_text(self):
         """更新描述文本内容"""
-        if self.text_processor.is_markdown(self.prompt):
-            html_content = self.text_processor.convert_markdown_to_html(self.prompt, self.line_height)
-        else:
-            html_content = self.text_processor.convert_text_to_html(self.prompt, self.line_height)
-        
-        self.description_text.setHtml(html_content)
+        # 使用增强markdown渲染器处理内容
+        self.description_text.set_markdown_content(self.prompt)
 
     def adjust_font_size(self, factor: float):
         """调整字体大小"""

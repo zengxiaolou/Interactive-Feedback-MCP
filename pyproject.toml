@@ -9,4 +9,5 @@ dependencies = [
     "psutil>=7.0.0",
     "pyside6>=6.8.2.1",
     "markdown>=3.4.0",
+    "pygments>=2.15.0",
 ]
