@@ -686,7 +686,7 @@ class FeedbackUI(QMainWindow):
         # 增加一行文本 ： by rowanyang 居中显示，允许选中和复制文本
         if sys.platform == "darwin":  # macOS
             zoom_shortcut_text = "CMD+/-"
-            line_height_shortcut_text = "CMD+OPT+H"
+            line_height_shortcut_text = "CMD+Shift+L"
         else:  # Windows, Linux, etc.
             zoom_shortcut_text = "CTRL+/-"
             line_height_shortcut_text = "CTRL+ALT+H"
@@ -720,9 +720,10 @@ class FeedbackUI(QMainWindow):
 
         # 切换行高: 根据平台设置不同的快捷键
         if sys.platform == "darwin":  # macOS
-            key_sequence = "Cmd+Option+H"
+            key_sequence = "Ctrl+Shift+L"  # 在Mac上Ctrl映射为Command键，使用简单组合
         else:  # Windows, Linux, etc.
             key_sequence = "Ctrl+Alt+H"
+
         toggle_line_height_shortcut = QShortcut(QKeySequence(key_sequence), self)
         toggle_line_height_shortcut.activated.connect(self._toggle_line_height)
 
@@ -745,7 +746,7 @@ class FeedbackUI(QMainWindow):
                 html_content = self._convert_markdown_to_html(prompt)
             else:
                 html_content = self._convert_text_to_html(prompt)
-            
+
             self.description_text.setHtml(html_content)
 
         except Exception as e:
