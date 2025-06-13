@@ -26,13 +26,18 @@ class FeedbackTextEdit(QTextEdit):
         self.image_data: List[Dict[str, Any]] = []
 
     def keyPressEvent(self, event: QKeyEvent):
-        """处理键盘事件，支持Ctrl+Enter提交"""
-        if event.key() == Qt.Key_Return and event.modifiers() == Qt.ControlModifier:
-            # 触发提交操作
-            parent_window = self.window()
-            if hasattr(parent_window, '_submit_feedback'):
-                parent_window._submit_feedback()
-            return
+        """处理键盘事件，支持Enter提交，Shift+Enter换行"""
+        if event.key() == Qt.Key_Return:
+            if event.modifiers() == Qt.ShiftModifier:
+                # Shift+Enter: 换行
+                super().keyPressEvent(event)
+                return
+            else:
+                # Enter: 提交操作
+                parent_window = self.window()
+                if hasattr(parent_window, '_submit_feedback'):
+                    parent_window._submit_feedback()
+                return
         super().keyPressEvent(event)
 
     def _convert_image_to_base64(self, image):

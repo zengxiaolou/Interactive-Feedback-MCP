@@ -155,17 +155,6 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self._update_description_text()
         layout.addWidget(self.description_text)
         
-        # 项目上下文信息 - 简化布局
-        context_label = QLabel("📁 项目上下文")
-        context_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#4CAF50', 'large'))
-        layout.addWidget(context_label)
-        
-        context_text = QTextBrowser()
-        context_text.setStyleSheet(EnhancedGlassmorphismTheme.get_text_browser_style())
-        context_text.setMaximumHeight(250)  # 增加高度到250
-        context_text.setHtml(self._get_enhanced_project_context())
-        layout.addWidget(context_text)
-        
         layout.addStretch()
         return panel
 
@@ -299,13 +288,13 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.custom_input = FeedbackTextEdit()
         self.custom_input.setStyleSheet(EnhancedGlassmorphismTheme.get_text_edit_style())
         self.custom_input.setMaximumHeight(120)  # 增加输入框高度
-        self.custom_input.setPlaceholderText("输入自定义文本或反馈，支持粘贴图片/链接 | Ctrl+Enter发送")
+        self.custom_input.setPlaceholderText("输入自定义文本或反馈，支持粘贴图片/链接 | Shift+Enter换行，Enter发送")
         layout.addWidget(self.custom_input)
         
         # 按钮区域 - 使用增强版样式
         button_layout = QHBoxLayout()
         
-        submit_btn = QPushButton("✅ 提交 (Ctrl+ENTER)")
+        submit_btn = QPushButton("✅ 提交 (ENTER)")
         submit_btn.setStyleSheet(EnhancedGlassmorphismTheme.get_button_style('secondary'))
         submit_btn.clicked.connect(self._submit_feedback)
         
@@ -530,10 +519,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         reset_font.activated.connect(self.reset_font_size)
         
         # PRD文档中定义的快捷键
-        # Enter: 提交反馈
-        submit_shortcut = QShortcut(QKeySequence("Return"), self)
-        submit_shortcut.activated.connect(self._submit_feedback)
-        
+        # Enter: 由文本框处理，不设置全局快捷键
         # Esc: 取消/关闭
         cancel_shortcut = QShortcut(QKeySequence("Escape"), self)
         cancel_shortcut.activated.connect(self.close)
