@@ -95,13 +95,13 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.settings = QSettings("InteractiveFeedbackMCP", "InteractiveFeedbackMCP")
         self.line_height = self._load_line_height()
         
-        # 设置窗口大小和位置 - 调整为更高的窗口
+        # 设置窗口大小和位置 - 增加整体宽度
         screen = QApplication.primaryScreen().geometry()
-        window_height = min(1200, int(screen.height() * 0.85))  # 增加高度到1200
-        window_width = min(1400, int(screen.width() * 0.80))   # 保持宽度1400
+        window_height = min(1200, int(screen.height() * 0.85))  # 保持高度1200
+        window_width = min(1600, int(screen.width() * 0.90))   # 增加宽度到1600
         
         self.resize(window_width, window_height)
-        self.setMinimumSize(1000, 800)  # 最小高度也增加到800
+        self.setMinimumSize(1200, 800)  # 最小宽度增加到1200
         
         # 窗口居中
         x = (screen.width() - window_width) // 2
@@ -132,8 +132,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
         main_splitter.addWidget(center_panel)
         main_splitter.addWidget(right_panel)
         
-        # 调整比例：左侧增加1/3，从40%增加到53%，中间减少到27%，右侧保持20%
-        main_splitter.setSizes([530, 270, 200])  # 相对比例：53% + 27% + 20% = 100%
+        # 优化比例：左侧50%，中间35%，右侧15% - 给中间栏更多空间
+        main_splitter.setSizes([500, 350, 150])  # 相对比例：50% + 35% + 15% = 100%
         main_splitter.setCollapsible(0, False)  # 左侧面板不可折叠
         main_splitter.setCollapsible(1, False)  # 中间面板不可折叠
         main_splitter.setCollapsible(2, True)   # 右侧面板可折叠
