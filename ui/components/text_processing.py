@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Text Processing Component for Interactive Feedback MCP
 # 文本处理组件
 
@@ -124,7 +125,7 @@ class TextProcessor:
         styled_html = f"""<div style="
             line-height: {line_height};
             color: #ccc;
-            font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+            font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'Segoe UI', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
             white-space: pre-wrap;
         ">{html_text}</div>"""
 
@@ -188,7 +189,7 @@ class TextProcessor:
                 }}
                 .md-content {{
                     color: #ccc;
-                    font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+                    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'Segoe UI', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
                     white-space: pre-wrap;
                 }}
 

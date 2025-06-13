@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Three Column Layout Component for Interactive Feedback MCP
 # 三栏式布局组件
 

@@ -41,6 +41,20 @@ def main():
     app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     
+    # 设置中文字体支持
+    from PySide6.QtGui import QFont
+    default_font = QFont()
+    chinese_fonts = ['PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'STHeiti']
+    for font_name in chinese_fonts:
+        default_font.setFamily(font_name)
+        if QFont(font_name).exactMatch():
+            break
+    else:
+        default_font = app.font()
+    
+    default_font.setPointSize(14)
+    app.setFont(default_font)
+    
     # 处理预定义选项
     predefined_options = []
     if args.predefined_options:

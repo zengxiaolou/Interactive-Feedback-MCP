@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Interactive Feedback MCP UI
 # Developed by Fábio Ferreira (https://x.com/fabiomlferreira)
 # Inspired by/related to dotcursorrules.com (https://dotcursorrules.com/)
@@ -201,17 +202,17 @@ class FeedbackUI(QMainWindow):
         # Load general UI settings for the main window (geometry, state)
         self.settings.beginGroup("MainWindow_General")
 
-        # 设置窗口大小为屏幕高度的60%，宽度保持800
+        # 设置窗口大小为屏幕高度的60%，宽度调整为1800
         screen = QApplication.primaryScreen().geometry()
         screen_height = screen.height()
         window_height = int(screen_height * 0.7)  # 屏幕高度的60%
-        window_width = 800
+        window_width = 1800
 
         # 设置窗口的初始大小，但允许用户调整
         self.resize(window_width, window_height)
 
         # 设置最小窗口尺寸，防止UI元素挤在一起
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(800, 400)
 
         # 窗口居中显示
         x = (screen.width() - window_width) // 2
@@ -237,9 +238,23 @@ class FeedbackUI(QMainWindow):
 
     def _preprocess_text(self, text: str) -> str:
         """
-        预处理文本，处理转义字符问题
+        预处理文本，处理转义字符问题和编码问题
         特别处理从Cursor编辑器传入时的转义问题
         """
+        # 确保文本是字符串类型
+        if not isinstance(text, str):
+            text = str(text)
+        
+        # 确保文本是UTF-8编码
+        if isinstance(text, bytes):
+            try:
+                text = text.decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    text = text.decode('gbk')
+                except UnicodeDecodeError:
+                    text = text.decode('utf-8', errors='replace')
+        
         # 记录原始文本（用于调试）
         print(f"原始文本: {repr(text)}")
 
@@ -350,7 +365,7 @@ class FeedbackUI(QMainWindow):
         styled_html = f"""<div style="
             line-height: {self.line_height};
             color: #ccc;
-            font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+            font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'Segoe UI', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
             white-space: pre-wrap;
         ">{html_text}</div>"""
 
@@ -417,7 +432,7 @@ class FeedbackUI(QMainWindow):
                 }}
                 .md-content {{
                     color: #ccc;
-                    font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+                    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'Segoe UI', system-ui, -apple-system, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
                     white-space: pre-wrap;
                 }}
 
@@ -1212,9 +1227,19 @@ def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, out
     app.setPalette(get_dark_mode_palette(app))
     app.setStyle("Fusion")
 
-    # ----- 统一设置全局默认字体大小 -----
-    default_font = app.font()           # 拿到当前系统/风格默认的 QFont
-    default_font.setPointSize(15)       # 设定全局字号为 11pt，按需修改
+    # ----- 统一设置全局默认字体大小和中文字体支持 -----
+    default_font = QFont()
+    # 设置中文优先字体列表
+    chinese_fonts = ['PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'STHeiti']
+    for font_name in chinese_fonts:
+        default_font.setFamily(font_name)
+        if QFont(font_name).exactMatch():
+            break
+    else:
+        # 如果没有找到中文字体，使用系统默认字体
+        default_font = app.font()
+    
+    default_font.setPointSize(15)       # 设定全局字号为15pt
     app.setFont(default_font)
 
     ui = FeedbackUI(prompt, predefined_options)
@@ -1224,8 +1249,8 @@ def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, out
         # Ensure the directory exists
         os.makedirs(os.path.dirname(output_file) if os.path.dirname(output_file) else ".", exist_ok=True)
         # Save the result to the output file
-        with open(output_file, "w") as f:
-            json.dump(result, f)
+        with open(output_file, "w", encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
         return None
 
     return result

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Interactive Feedback MCP
 # Developed by Fábio Ferreira (https://x.com/fabiomlferreira)
 # Inspired by/related to dotcursorrules.com (https://dotcursorrules.com/)
@@ -50,7 +51,7 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
             raise Exception(f"Failed to launch feedback UI: {result.returncode}")
 
         # Read the result from the temporary file
-        with open(output_file, 'r') as f:
+        with open(output_file, 'r', encoding='utf-8') as f:
             result = json.load(f)
         os.unlink(output_file)
         return result
