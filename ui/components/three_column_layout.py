@@ -325,7 +325,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
                 padding: 5px;
             }
         """)
-        self.images_container.setFixedHeight(120)  # 增加高度到120px
+        self.images_container.setFixedHeight(140)  # 进一步增加高度到140px
         self.images_container.setVisible(False)  # 默认隐藏
         
         # 图片预览标题
@@ -356,13 +356,13 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.images_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.images_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.images_scroll_area.setWidgetResizable(True)
-        self.images_scroll_area.setFixedHeight(95)  # 增加图片显示区域高度
+        self.images_scroll_area.setFixedHeight(115)  # 进一步增加图片显示区域高度
         
         # 图片容器widget
         images_widget = QWidget()
         self.images_layout = QHBoxLayout(images_widget)
-        self.images_layout.setSpacing(5)  # 图片间距
-        self.images_layout.setContentsMargins(5, 5, 5, 5)  # 内边距
+        self.images_layout.setSpacing(8)  # 增加图片间距
+        self.images_layout.setContentsMargins(8, 10, 8, 10)  # 增加内边距
         self.images_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 左对齐，垂直居中
         
         # 添加弹性空间，确保图片靠左对齐
@@ -372,8 +372,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         # 将组件添加到容器
         container_layout = QVBoxLayout(self.images_container)
-        container_layout.setContentsMargins(8, 5, 8, 5)
-        container_layout.setSpacing(3)
+        container_layout.setContentsMargins(10, 8, 10, 8)  # 增加内边距
+        container_layout.setSpacing(5)  # 增加间距
         container_layout.addWidget(preview_title)
         container_layout.addWidget(self.images_scroll_area)
         
@@ -391,7 +391,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         original_height = pixmap.height()
         
         # 固定高度，保持宽高比
-        target_height = 80  # 增加预览图片高度
+        target_height = 70  # 调整预览图片高度，稍微小一些
         scaled_width = int(original_width * (target_height / original_height))
         
         # 创建图片容器帧
