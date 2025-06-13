@@ -191,6 +191,10 @@ class FeedbackUI(QMainWindow):
         self.setWindowIcon(QIcon(icon_path))
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
+        # 设置窗口透明度和毛玻璃效果
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowOpacity(0.95)
+
         self.settings = QSettings("InteractiveFeedbackMCP", "InteractiveFeedbackMCP")
         self.line_height = self._load_line_height()
 
@@ -215,6 +219,18 @@ class FeedbackUI(QMainWindow):
         self.move(x, y)
 
         self.settings.endGroup() # End "MainWindow_General" group
+
+        # 设置主窗口的毛玻璃样式
+        self.setStyleSheet("""
+            QMainWindow {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(30, 30, 40, 0.85),
+                    stop:0.5 rgba(40, 40, 50, 0.80),
+                    stop:1 rgba(25, 25, 35, 0.85));
+                border-radius: 15px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        """)
 
         self._create_ui()
         self._setup_shortcuts()  # 添加快捷键设置
@@ -488,8 +504,17 @@ class FeedbackUI(QMainWindow):
     def _create_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+        
+        # 为中央widget设置毛玻璃背景
+        central_widget.setStyleSheet("""
+            QWidget {
+                background: rgba(255, 255, 255, 0.02);
+                border-radius: 12px;
+            }
+        """)
+        
         layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(15,8,15,5)
+        layout.setContentsMargins(20, 15, 20, 15)
 
         # Description text area (from self.prompt) - Support multiline, selectable and copyable with markdown support
         self.description_text = QTextBrowser()
@@ -500,21 +525,40 @@ class FeedbackUI(QMainWindow):
         self.description_text.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 需要时显示滚动条
         self.description_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-        # 设置样式，让它看起来更像信息展示区域而不是输入框
-        # 为 QTextBrowser 设置样式，让它看起来更像信息展示区域
-        self.description_text.setStyleSheet(
-            "QTextBrowser {"
-            # "  border: 1px solid #444444;"
-            "  border-radius: 8px;"
-            "  padding: 5px;"
-            "  margin-bottom: 3px;"
-            "  background-color: rgba(255, 255, 255, 0.05);"
-            "  selection-background-color: #2196F3;"
-            "}"
-            "QTextBrowser:focus {"
-            "  border: 1px solid #2196F3;"
-            "}"
-        )
+        # 为 QTextBrowser 设置毛玻璃样式
+        self.description_text.setStyleSheet("""
+            QTextBrowser {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                padding: 15px;
+                margin-bottom: 8px;
+                color: #e0e0e0;
+                selection-background-color: rgba(33, 150, 243, 0.6);
+                backdrop-filter: blur(10px);
+            }
+            QTextBrowser:focus {
+                border: 2px solid rgba(33, 150, 243, 0.8);
+                background: rgba(255, 255, 255, 0.12);
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
 
         layout.addWidget(self.description_text)
 
@@ -522,8 +566,17 @@ class FeedbackUI(QMainWindow):
         self.option_checkboxes = []
         if self.predefined_options and len(self.predefined_options) > 0:
             options_frame = QFrame()
+            options_frame.setStyleSheet("""
+                QFrame {
+                    background: rgba(255, 255, 255, 0.06);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 10px;
+                    padding: 10px;
+                    margin: 5px 0px;
+                }
+            """)
             options_layout = QVBoxLayout(options_frame)
-            options_layout.setContentsMargins(0,5,0,10)
+            options_layout.setContentsMargins(15, 10, 15, 10)
 
             for option in self.predefined_options:
                 checkbox = QCheckBox(option)
@@ -531,6 +584,36 @@ class FeedbackUI(QMainWindow):
                 font = checkbox.font()
                 font.setPointSize(font.pointSize())
                 checkbox.setFont(font)
+                
+                # 为复选框设置毛玻璃样式
+                checkbox.setStyleSheet("""
+                    QCheckBox {
+                        color: #e0e0e0;
+                        spacing: 8px;
+                        padding: 5px;
+                    }
+                    QCheckBox::indicator {
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 4px;
+                        border: 2px solid rgba(255, 255, 255, 0.3);
+                        background: rgba(255, 255, 255, 0.1);
+                    }
+                    QCheckBox::indicator:hover {
+                        border: 2px solid rgba(33, 150, 243, 0.6);
+                        background: rgba(33, 150, 243, 0.2);
+                    }
+                    QCheckBox::indicator:checked {
+                        background: rgba(33, 150, 243, 0.8);
+                        border: 2px solid rgba(33, 150, 243, 1.0);
+                        image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOSIgdmlld0JveD0iMCAwIDEyIDkiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDQuNUw0LjUgOEwxMSAxIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K);
+                    }
+                    QCheckBox:hover {
+                        background: rgba(255, 255, 255, 0.05);
+                        border-radius: 6px;
+                    }
+                """)
+                
                 self.option_checkboxes.append(checkbox)
                 options_layout.addWidget(checkbox)
 
@@ -540,16 +623,17 @@ class FeedbackUI(QMainWindow):
         self.images_container = QFrame()
         self.images_container.setStyleSheet("""
             QFrame {
-                background: transparent;
-                border: none;
-                padding: 0px;
-                margin: 0px;
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+                padding: 5px;
+                margin: 2px 0px;
             }
         """)
         self.images_container.setFixedHeight(80)  # 使用固定高度
         self.images_layout = QHBoxLayout(self.images_container)
         self.images_layout.setSpacing(5)  # 减少图片间距
-        self.images_layout.setContentsMargins(0, 0, 0, 5)  # 移除内边距
+        self.images_layout.setContentsMargins(5, 5, 5, 5)  # 调整内边距
         self.images_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 图片左对齐且垂直居中
         self.images_container.setVisible(False)  # 默认隐藏
 
@@ -559,7 +643,7 @@ class FeedbackUI(QMainWindow):
         scroll_area.setFixedHeight(80)  # 使用固定高度
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setFrameShape(QFrame.NoFrame)  # 无边框
+        scroll_area.setFrameShape(QFrame.NoFrame)
         scroll_area.setStyleSheet("""
             QScrollArea {
                 background: transparent;
@@ -569,14 +653,17 @@ class FeedbackUI(QMainWindow):
             }
             QScrollBar:horizontal {
                 height: 8px;
-                background: rgba(0, 0, 0, 0.1);
+                background: rgba(255, 255, 255, 0.1);
                 border-radius: 4px;
-                margin: 0px 0px 0px 0px;
+                margin: 0px;
             }
             QScrollBar::handle:horizontal {
-                background: #666;
+                background: rgba(255, 255, 255, 0.3);
                 border-radius: 4px;
                 min-width: 20px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: rgba(255, 255, 255, 0.5);
             }
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
                 width: 0px;
@@ -587,7 +674,7 @@ class FeedbackUI(QMainWindow):
         self.scroll_area = scroll_area  # 保存引用以便控制可见性
         layout.addWidget(scroll_area, 0)  # 使用0作为拉伸因子，防止自动拉伸
         # 减小滚动区域与其他元素之间的间距
-        layout.setSpacing(2)  # 设置整体布局的间距更小
+        layout.setSpacing(8)  # 设置整体布局的间距
 
         # Free-form text feedback
         self.feedback_text = FeedbackTextEdit()
@@ -597,15 +684,40 @@ class FeedbackUI(QMainWindow):
         font = self.feedback_text.font()
         font.setPointSize(font.pointSize() )
         self.feedback_text.setFont(font)
-        self.feedback_text.setStyleSheet(
-            "QTextEdit {"
-            "  border-radius: 8px;"
-            "  padding: 0px;"
-            "  margin: 0px 0 10px 0;"
-            "  border: 1px solid #444444;"
-            "  background-color: #222;"
-            "}"
-        )
+        
+        # 为文本输入框设置毛玻璃样式
+        self.feedback_text.setStyleSheet("""
+            QTextEdit {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                padding: 12px;
+                margin: 5px 0px 15px 0px;
+                color: #e0e0e0;
+                selection-background-color: rgba(33, 150, 243, 0.6);
+            }
+            QTextEdit:focus {
+                border: 2px solid rgba(33, 150, 243, 0.8);
+                background: rgba(255, 255, 255, 0.12);
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
 
         # 设置一个很小的文档边距，既美观又不会有明显空白
         document = self.feedback_text.document()
@@ -614,7 +726,6 @@ class FeedbackUI(QMainWindow):
         # 设置最小和最大高度，以及滚动策略
         font_metrics = self.feedback_text.fontMetrics()
         row_height = font_metrics.height()
-        # padding = self.feedback_text.contentsMargins().top() + self.feedback_text.contentsMargins().bottom() + 5
 
         # 最小高度：5行文本
         min_height = 5 * row_height
@@ -643,46 +754,69 @@ class FeedbackUI(QMainWindow):
 
         # Add buttons to the horizontal layout
         button_layout.addWidget(cancel_button) # Put cancel on the left
-        button_layout.addWidget(submit_button) # Put submit on the right
+        button_layout.addWidget(submit_button)
 
-        # Apply modern style and increase size for the submit button
-        submit_button.setStyleSheet(
-            "QPushButton {"
-            "  padding: 10px 20px;margin-left:20px;"
-            "  font-size: 14px;"
-            "  border-radius: 5px;"
-            "  background-color: #2196F3; /* Blue */"
-            "  color: white;"
-            "  border: none;"
-            "}"
-            "QPushButton:hover {"
-            "  background-color: #1976D2;"
-            "}"
-            "QPushButton:pressed {"
-            "  background-color: #1565C0;"
-            "}"
-        )
+        # 为提交按钮设置毛玻璃样式
+        submit_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(33, 150, 243, 0.8),
+                    stop:1 rgba(21, 101, 192, 0.8));
+                color: white;
+                border: 1px solid rgba(33, 150, 243, 0.6);
+                border-radius: 8px;
+                padding: 12px 24px;
+                margin-left: 20px;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(33, 150, 243, 0.9),
+                    stop:1 rgba(21, 101, 192, 0.9));
+                border: 1px solid rgba(33, 150, 243, 0.8);
+                transform: translateY(-1px);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(21, 101, 192, 0.9),
+                    stop:1 rgba(13, 71, 161, 0.9));
+                transform: translateY(0px);
+            }
+        """)
 
-        # Apply modern style and increase size for the cancel button
-        cancel_button.setStyleSheet(
-            "QPushButton {"
-            "  padding: 10px 20px;margin-right:20px;"
-            "  font-size: 14px;"
-            "  border-radius: 5px;"
-            "  background-color: #9E9E9E; /* Grey */"
-            "  color: white;"
-            "  border: none;"
-            "}"
-            "QPushButton:hover {"
-            "  background-color: #757575;"
-            "}"
-            "QPushButton:pressed {"
-            "  background-color: #616161;"
-            "}"
-        )
+        # 为取消按钮设置毛玻璃样式
+        cancel_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(158, 158, 158, 0.6),
+                    stop:1 rgba(117, 117, 117, 0.6));
+                color: white;
+                border: 1px solid rgba(158, 158, 158, 0.4);
+                border-radius: 8px;
+                padding: 12px 24px;
+                margin-right: 20px;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(158, 158, 158, 0.7),
+                    stop:1 rgba(117, 117, 117, 0.7));
+                border: 1px solid rgba(158, 158, 158, 0.6);
+                transform: translateY(-1px);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(117, 117, 117, 0.8),
+                    stop:1 rgba(97, 97, 97, 0.8));
+                transform: translateY(0px);
+            }
+        """)
 
         layout.addWidget(self.feedback_text)
         layout.addLayout(button_layout)
+        
         # 增加一行文本 ： by rowanyang 居中显示，允许选中和复制文本
         if sys.platform == "darwin":  # macOS
             zoom_shortcut_text = "CMD+/-"
@@ -693,7 +827,17 @@ class FeedbackUI(QMainWindow):
 
         label_text = f"支持 {zoom_shortcut_text} 缩放字体，{line_height_shortcut_text} 调整行高(5档循环)  Contact: RowanYang"
         by_rowanyang_label = QLabel(label_text)
-        by_rowanyang_label.setStyleSheet(""" color: gray; font-size: 10pt; font-family:"PingFang SC", "Hiragino Sans GB", sans-serif; """)
+        by_rowanyang_label.setStyleSheet("""
+            QLabel {
+                color: rgba(255, 255, 255, 0.6);
+                font-size: 10pt;
+                font-family: "PingFang SC", "Hiragino Sans GB", sans-serif;
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 6px;
+                padding: 5px 10px;
+                margin: 5px 0px;
+            }
+        """)
         by_rowanyang_label.setTextInteractionFlags(Qt.TextSelectableByMouse) # Allow text selection
 
         # Create a QHBoxLayout to align "By RowanYang" to the center
