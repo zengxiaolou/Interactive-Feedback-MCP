@@ -10,10 +10,10 @@ from typing import Optional, List, TypedDict
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QCheckBox, QTextBrowser, QFrame,
-    QScrollArea, QApplication, QTextEdit, QSplitter
+    QScrollArea, QApplication, QTextEdit, QSplitter, QGridLayout
 )
 from PySide6.QtCore import Qt, QSettings, QTimer
-from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFont
+from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFont, QPixmap
 
 from ..widgets.feedback_text_edit import FeedbackTextEdit
 from ..styles.glassmorphism import GlassmorphismStyles
@@ -246,6 +246,9 @@ class ThreeColumnFeedbackUI(QMainWindow):
         hint_label.setStyleSheet("color: #666; font-size: 11px; margin-top: 10px;")
         layout.addWidget(hint_label)
         
+        # 图片预览区域 - 位于选项列表最后
+        self._add_image_preview_section(layout)
+        
         layout.addStretch()
         return panel
 
@@ -288,6 +291,10 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.custom_input.setStyleSheet(EnhancedGlassmorphismTheme.get_text_edit_style())
         self.custom_input.setMaximumHeight(120)  # 增加输入框高度
         self.custom_input.setPlaceholderText("输入自定义文本或反馈，支持粘贴图片/链接 | Shift+Enter换行，Enter发送")
+        
+        # 连接图片粘贴信号到中间栏预览
+        self.custom_input.image_pasted.connect(self._on_image_pasted)
+        
         layout.addWidget(self.custom_input)
         
         # 按钮区域 - 使用增强版样式
@@ -304,6 +311,213 @@ class ThreeColumnFeedbackUI(QMainWindow):
         button_layout.addWidget(submit_btn)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
+
+    def _add_image_preview_section(self, layout):
+        """添加图片预览区域到中间栏"""
+        # 图片预览容器 - 与智能推荐选项保持一致的样式
+        self.images_container = QFrame()
+        self.images_container.setStyleSheet("""
+            QFrame {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                margin: 5px 0px;
+                padding: 5px;
+            }
+        """)
+        self.images_container.setFixedHeight(90)  # 包含边距的总高度
+        self.images_container.setVisible(False)  # 默认隐藏
+        
+        # 图片预览标题
+        preview_title = QLabel("🖼️ 图片预览")
+        preview_title.setStyleSheet("color: #9C27B0; font-weight: bold; font-size: 12px; margin-bottom: 5px;")
+        
+        # 创建滚动区域用于图片预览
+        self.images_scroll_area = QScrollArea()
+        self.images_scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollBar:horizontal {
+                height: 8px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+            }
+            QScrollBar::handle:horizontal {
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 4px;
+                min-width: 20px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+        """)
+        self.images_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.images_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.images_scroll_area.setWidgetResizable(True)
+        self.images_scroll_area.setFixedHeight(70)  # 图片显示区域高度
+        
+        # 图片容器widget
+        images_widget = QWidget()
+        self.images_layout = QHBoxLayout(images_widget)
+        self.images_layout.setSpacing(5)  # 图片间距
+        self.images_layout.setContentsMargins(5, 5, 5, 5)  # 内边距
+        self.images_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 左对齐，垂直居中
+        
+        # 添加弹性空间，确保图片靠左对齐
+        self.images_layout.addStretch(1)
+        
+        self.images_scroll_area.setWidget(images_widget)
+        
+        # 将组件添加到容器
+        container_layout = QVBoxLayout(self.images_container)
+        container_layout.setContentsMargins(8, 5, 8, 5)
+        container_layout.setSpacing(3)
+        container_layout.addWidget(preview_title)
+        container_layout.addWidget(self.images_scroll_area)
+        
+        # 添加到主布局
+        layout.addWidget(self.images_container)
+
+    def _on_image_pasted(self, pixmap):
+        """处理粘贴的图片，显示在中间栏预览区域"""
+        # 确保图片容器可见
+        if not self.images_container.isVisible():
+            self.images_container.setVisible(True)
+        
+        # 获取原始图片尺寸
+        original_width = pixmap.width()
+        original_height = pixmap.height()
+        
+        # 固定高度，保持宽高比
+        target_height = 60  # 预览图片高度
+        scaled_width = int(original_width * (target_height / original_height))
+        
+        # 创建图片容器帧
+        image_frame = QFrame()
+        image_frame.setMinimumWidth(scaled_width)
+        image_frame.setStyleSheet("""
+            QFrame {
+                background: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+                padding: 2px;
+                margin: 1px;
+            }
+            QFrame:hover {
+                border: 1px solid rgba(255, 255, 255, 0.4);
+            }
+        """)
+        
+        # 使用QGridLayout放置图片和删除按钮
+        frame_layout = QGridLayout(image_frame)
+        frame_layout.setContentsMargins(0, 0, 0, 0)
+        frame_layout.setSpacing(0)
+        
+        # 创建图片标签
+        image_label = QLabel()
+        image_label.setStyleSheet("border: none; background: transparent;")
+        image_label.setScaledContents(False)
+        image_label.setAlignment(Qt.AlignCenter)
+        image_label.setMinimumSize(scaled_width, target_height)
+        image_label.setMaximumSize(scaled_width, target_height)
+        
+        # 缩放图片，保持宽高比
+        scaled_pixmap = pixmap.scaled(
+            scaled_width,
+            target_height,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+        
+        # 支持高DPI屏幕
+        device_pixel_ratio = QApplication.primaryScreen().devicePixelRatio()
+        if device_pixel_ratio > 1.0:
+            hires_scaled_width = int(scaled_width * device_pixel_ratio)
+            hires_target_height = int(target_height * device_pixel_ratio)
+            
+            hires_pixmap = pixmap.scaled(
+                hires_scaled_width,
+                hires_target_height,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            hires_pixmap.setDevicePixelRatio(device_pixel_ratio)
+            image_label.setPixmap(hires_pixmap)
+        else:
+            image_label.setPixmap(scaled_pixmap)
+        
+        # 删除按钮
+        delete_button = QPushButton("×")
+        delete_button.setFixedSize(16, 16)
+        delete_button.setCursor(Qt.PointingHandCursor)
+        delete_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 0, 0, 0.7);
+                color: white;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 10px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 0, 0, 0.9);
+            }
+        """)
+        
+        # 删除图片的功能
+        def delete_image():
+            # 获取图片索引
+            index = self.images_layout.indexOf(image_frame)
+            if index >= 0:
+                # 从布局中移除
+                widget = self.images_layout.itemAt(index).widget()
+                if widget:
+                    widget.setParent(None)
+                    widget.deleteLater()
+                    
+                    # 从图片数据列表中删除（如果有的话）
+                    if hasattr(self, 'custom_input') and hasattr(self.custom_input, 'image_data'):
+                        if index < len(self.custom_input.image_data):
+                            del self.custom_input.image_data[index]
+                    
+                    # 检查是否还有图片
+                    has_images = False
+                    for i in range(self.images_layout.count()):
+                        item = self.images_layout.itemAt(i)
+                        if item and not item.spacerItem() and item.widget():
+                            has_images = True
+                            break
+                    
+                    # 如果没有图片了，隐藏容器
+                    if not has_images:
+                        self.images_container.setVisible(False)
+        
+        delete_button.clicked.connect(delete_image)
+        
+        # 将图片和删除按钮添加到布局
+        frame_layout.addWidget(image_label, 0, 0)
+        frame_layout.addWidget(delete_button, 0, 0, Qt.AlignTop | Qt.AlignRight)
+        
+        # 添加到图片布局，确保在弹性空间之前插入
+        if self.images_layout.count() > 0:
+            # 找到弹性空间的索引
+            stretch_index = -1
+            for i in range(self.images_layout.count()):
+                if self.images_layout.itemAt(i).spacerItem():
+                    stretch_index = i
+                    break
+            
+            if stretch_index >= 0:
+                # 在弹性空间之前插入图片
+                self.images_layout.insertWidget(stretch_index, image_frame)
+            else:
+                # 如果没有找到弹性空间，直接添加到末尾
+                self.images_layout.addWidget(image_frame)
+        else:
+            # 第一张图片，直接添加
+            self.images_layout.addWidget(image_frame)
 
     def _add_project_info_section(self, layout):
         """添加项目基础信息部分 - 增强版样式"""
