@@ -34,8 +34,22 @@ def main():
     
     # 创建应用程序
     app = QApplication(sys.argv)
-    app.setApplicationName("Interactive Feedback MCP - Enhanced UI")
+    
+    # 获取当前项目名称作为应用程序名称
+    project_name = os.path.basename(os.getcwd())
+    app_name = f"Interactive Feedback MCP - {project_name}"
+    app.setApplicationName(app_name)
     app.setApplicationVersion("2.0.0")
+    
+    # 设置应用程序图标（用于Dock显示）
+    from PySide6.QtGui import QIcon
+    import os
+    icon_path = os.path.join(os.path.dirname(__file__), "ui", "resources", "icons", "app_icon.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+        print(f"✅ 应用程序图标已设置: {icon_path}")
+    else:
+        print(f"⚠️ 应用程序图标文件不存在: {icon_path}")
     
     # 设置应用程序属性
     app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
@@ -63,7 +77,10 @@ def main():
     
     # 创建并显示UI
     ui = ThreeColumnFeedbackUI(args.prompt, predefined_options)
-    ui.setWindowTitle("Interactive Feedback MCP - Enhanced UI v2.0")
+    
+    # 获取当前项目名称作为标题的一部分
+    project_name = os.path.basename(os.getcwd())
+    ui.setWindowTitle(f"Interactive Feedback MCP - {project_name}")
     
     # 运行UI并获取结果
     ui.show()

@@ -100,6 +100,10 @@ class EnhancedMarkdownRenderer:
     def _render_with_markdown(self, text: str) -> str:
         """使用python-markdown渲染"""
         try:
+            # 确保文本是正确的编码
+            if isinstance(text, bytes):
+                text = text.decode('utf-8', errors='replace')
+            
             # 重置markdown实例
             self.md.reset()
             
@@ -130,6 +134,10 @@ class EnhancedMarkdownRenderer:
     
     def _render_basic(self, text: str) -> str:
         """基础渲染（回退方案）"""
+        # 确保文本是正确的编码
+        if isinstance(text, bytes):
+            text = text.decode('utf-8', errors='replace')
+            
         # 简单的文本到HTML转换
         html = text.replace('\n', '<br>')
         html = html.replace('**', '<strong>').replace('**', '</strong>')
@@ -152,7 +160,7 @@ class EnhancedMarkdownRenderer:
         """获取自定义CSS样式"""
         return """
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: transparent;
             color: #ffffff;
             line-height: 1.6;
@@ -341,12 +349,13 @@ class EnhancedTextBrowser(QTextBrowser):
         self.setOpenExternalLinks(False)  # 我们自己处理链接
         self.anchorClicked.connect(self._handle_link_click)
         
-        # 设置基础样式
+        # 设置基础样式，包含中文字体
         self.setStyleSheet("""
             QTextBrowser {
                 background: transparent;
                 border: none;
                 selection-background-color: rgba(33, 150, 243, 0.3);
+                font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             }
         """)
     

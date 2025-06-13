@@ -73,7 +73,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _setup_window(self):
         """设置窗口基本属性"""
-        self.setWindowTitle("🎯 Interactive Feedback MCP - Enhanced Context")
+        project_name = os.path.basename(os.getcwd())
+        self.setWindowTitle(f"Interactive Feedback MCP - {project_name}")
         
         # 设置应用图标
         if icon_manager.is_available():
@@ -266,10 +267,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         layout.setContentsMargins(12, 12, 12, 12)  # PRD: 组件间距12px
         layout.setSpacing(12)
         
-        # 标题 - 使用增强版样式
-        title = QLabel("🏗️ 项目信息")
-        title.setStyleSheet(EnhancedGlassmorphismTheme.get_title_style('#2196F3'))
-        layout.addWidget(title)
+        # 移除主标题，保留子标签
         
         # 项目基础信息
         self._add_project_info_section(layout)
@@ -294,7 +292,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         # 自定义文本输入 - 使用增强版样式
         self.custom_input = FeedbackTextEdit()
         self.custom_input.setStyleSheet(EnhancedGlassmorphismTheme.get_text_edit_style())
-        self.custom_input.setMaximumHeight(120)  # 增加输入框高度
+        self.custom_input.setMaximumHeight(180)  # 进一步增加输入框高度
         self.custom_input.setPlaceholderText("输入自定义文本或反馈，支持粘贴图片/链接 | Shift+Enter换行，Enter发送")
         
         # 连接图片粘贴信号到中间栏预览
@@ -525,7 +523,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
             self.images_layout.addWidget(image_frame)
 
     def _add_project_info_section(self, layout):
-        """添加项目基础信息部分 - 增强版样式"""
+        """添加项目基础信息部分 - 增强版样式，使用实际项目数据"""
         info_label = QLabel("🏗️ 项目基础")
         info_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#2196F3', 'large'))
         layout.addWidget(info_label)
@@ -536,13 +534,33 @@ class ThreeColumnFeedbackUI(QMainWindow):
         info_layout = QVBoxLayout(info_frame)
         info_layout.setSpacing(5)
         
-        # 项目信息
+        # 获取实际项目信息
+        project_data = self.project_info
+        
+        # 检测项目类型
+        project_type = "Python Package"
+        if os.path.exists("pyproject.toml"):
+            project_type = "Python Package (pyproject.toml)"
+        elif os.path.exists("requirements.txt"):
+            project_type = "Python Project"
+        elif os.path.exists("package.json"):
+            project_type = "Node.js Project"
+        
+        # 计算项目大小
+        try:
+            import subprocess
+            result = subprocess.run(['du', '-sh', '.'], capture_output=True, text=True, timeout=5)
+            project_size = result.stdout.split()[0] if result.returncode == 0 else "未知"
+        except:
+            project_size = "未知"
+        
+        # 实际项目信息
         project_info = [
-            ("名称:", "admin"),
-            ("类型:", "unknown"),
-            ("文件数:", "93"),
-            ("大小:", "2.64 MB"),
-            ("路径:", "/Documents/work/prototype/admin")
+            ("名称:", project_data.get("name", "未知")),
+            ("类型:", project_type),
+            ("文件数:", str(project_data.get("files", 0))),
+            ("大小:", project_size),
+            ("路径:", os.path.basename(project_data.get("path", "未知")))
         ]
         
         for label, value in project_info:
@@ -553,6 +571,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
             
             value_widget = QLabel(value)
             value_widget.setStyleSheet("color: #fff; font-size: 11px;")
+            value_widget.setWordWrap(True)
             
             row.addWidget(label_widget)
             row.addWidget(value_widget)
@@ -562,7 +581,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         layout.addWidget(info_frame)
 
     def _add_git_info_section(self, layout):
-        """添加Git状态信息部分"""
+        """添加Git状态信息部分，使用实际Git数据"""
         git_label = QLabel("🌿 Git状态")
         git_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 10px;")
         layout.addWidget(git_label)
@@ -573,14 +592,38 @@ class ThreeColumnFeedbackUI(QMainWindow):
         git_layout = QVBoxLayout(git_frame)
         git_layout.setSpacing(5)
         
-        # Git信息
+        # 获取实际Git信息
+        git_data = self.git_info
+        
+        # 获取额外Git信息
+        try:
+            # 获取未跟踪文件数
+            untracked_result = subprocess.run(['git', 'ls-files', '--others', '--exclude-standard'], 
+                                            capture_output=True, text=True, timeout=5)
+            untracked_count = len(untracked_result.stdout.strip().split('\n')) if untracked_result.stdout.strip() else 0
+            
+            # 获取提交作者
+            author_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%an'], 
+                                         capture_output=True, text=True, timeout=5)
+            author = author_result.stdout.strip() if author_result.returncode == 0 else "未知"
+            
+            # 获取提交时间
+            time_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%ar'], 
+                                       capture_output=True, text=True, timeout=5)
+            commit_time = time_result.stdout.strip() if time_result.returncode == 0 else "未知"
+        except:
+            untracked_count = 0
+            author = "未知"
+            commit_time = "未知"
+        
+        # 实际Git信息
         git_info = [
-            ("分支:", "main"),
-            ("修改文件:", "1个"),
-            ("未跟踪:", "3个"),
-            ("最后提交:", "重要更新: 集成AI对话框架\n完善一些..."),
-            ("作者:", "zengxiaoyu"),
-            ("时间:", "17 hours ago")
+            ("分支:", git_data.get("branch", "未知")),
+            ("修改文件:", f"{git_data.get('modified_files', 0)}个"),
+            ("未跟踪:", f"{untracked_count}个"),
+            ("最后提交:", git_data.get("last_commit", "无提交")[:50] + "..." if len(git_data.get("last_commit", "")) > 50 else git_data.get("last_commit", "无提交")),
+            ("作者:", author),
+            ("时间:", commit_time)
         ]
         
         for label, value in git_info:
@@ -609,7 +652,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         layout.addWidget(git_frame)
 
     def _add_project_activity_section(self, layout):
-        """添加项目活动信息部分"""
+        """添加项目活动信息部分，使用实际项目数据"""
         activity_label = QLabel("📊 项目活动")
         activity_label.setStyleSheet("color: #FF9800; font-weight: bold; font-size: 13px; margin-top: 10px;")
         layout.addWidget(activity_label)
@@ -620,13 +663,65 @@ class ThreeColumnFeedbackUI(QMainWindow):
         activity_layout = QVBoxLayout(activity_frame)
         activity_layout.setSpacing(5)
         
-        # 活动信息
+        # 获取实际项目活动信息
+        try:
+            # 统计文件类型
+            file_types = {}
+            large_files = 0
+            for root, dirs, files in os.walk('.'):
+                # 跳过隐藏目录和常见的非重要目录
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', '.venv']]
+                for file in files:
+                    if not file.startswith('.'):
+                        ext = os.path.splitext(file)[1].lower() or 'no_ext'
+                        file_types[ext] = file_types.get(ext, 0) + 1
+                        
+                        # 检查文件大小
+                        try:
+                            file_path = os.path.join(root, file)
+                            if os.path.getsize(file_path) > 100 * 1024:  # >100KB
+                                large_files += 1
+                        except:
+                            pass
+            
+            # 获取主要文件类型
+            top_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:3]
+            file_types_str = ", ".join([f"{ext}({count})" for ext, count in top_types])
+            
+            # 获取最近修改的文件
+            try:
+                recent_result = subprocess.run(['find', '.', '-type', 'f', '-mtime', '-1', '!', '-path', './.git/*'], 
+                                             capture_output=True, text=True, timeout=5)
+                recent_files = len(recent_result.stdout.strip().split('\n')) if recent_result.stdout.strip() else 0
+            except:
+                recent_files = 0
+            
+            # 检测主要语言
+            python_files = file_types.get('.py', 0)
+            js_files = file_types.get('.js', 0)
+            ts_files = file_types.get('.ts', 0)
+            
+            if python_files > 0:
+                main_language = "Python"
+            elif js_files > 0 or ts_files > 0:
+                main_language = "JavaScript/TypeScript" 
+            else:
+                main_language = "多语言"
+                
+        except Exception as e:
+            file_types_str = "未知"
+            large_files = 0
+            recent_files = 0
+            main_language = "未知"
+            print(f"项目活动信息收集错误: {e}")
+        
+        # 实际活动信息
         activity_info = [
-            ("最近修改:", "5个文件 (24小时内)"),
-            ("大文件:", "2个 (>100KB)"),
-            ("语言:", "中"),
-            ("文档类型:", "html(75), md(7), misc(2)"),
-            ("重要文件:", "quick-menu.html, md...")
+            ("最近修改:", f"{recent_files}个文件 (24小时内)"),
+            ("大文件:", f"{large_files}个 (>100KB)"),
+            ("主要语言:", main_language),
+            ("文件类型:", file_types_str),
+            ("总文件数:", str(self.project_info.get("files", 0)))
         ]
         
         for label, value in activity_info:
