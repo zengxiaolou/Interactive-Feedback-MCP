@@ -325,7 +325,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
                 padding: 5px;
             }
         """)
-        self.images_container.setFixedHeight(140)  # 进一步增加高度到140px
+        self.images_container.setFixedHeight(210)  # 再增加1/2高度到210px (140 + 70)
         self.images_container.setVisible(False)  # 默认隐藏
         
         # 图片预览标题
@@ -356,7 +356,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
         self.images_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.images_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.images_scroll_area.setWidgetResizable(True)
-        self.images_scroll_area.setFixedHeight(115)  # 进一步增加图片显示区域高度
+        self.images_scroll_area.setFixedHeight(172)  # 增加1/2高度到172px (115 + 57)
         
         # 图片容器widget
         images_widget = QWidget()
