@@ -109,6 +109,9 @@ class EnhancedMarkdownRenderer:
             # 确保文本是有效的UTF-8
             text = text.encode('utf-8', errors='replace').decode('utf-8')
             
+            # 清理乱码字符
+            text = self._clean_garbled_text(text)
+            
             # 重置markdown实例
             self.md.reset()
             
@@ -152,6 +155,9 @@ class EnhancedMarkdownRenderer:
         
         # 确保文本是有效的UTF-8
         text = text.encode('utf-8', errors='replace').decode('utf-8')
+        
+        # 清理乱码字符
+        text = self._clean_garbled_text(text)
             
         # 简单的文本到HTML转换
         html = text.replace('\n', '<br>')
@@ -356,13 +362,41 @@ class EnhancedMarkdownRenderer:
         }
         """
 
+    def _clean_garbled_text(self, text: str) -> str:
+        """清理乱码字符，替换为emoji或删除"""
+        import re
+        
+        # 常见的乱码模式和替换
+        replacements = {
+            # 菱形问号等乱码字符
+            r'[�]+': '❓',
+            r'[\ufffd]+': '❓',
+            # 控制字符
+            r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]': '',
+            # 其他常见乱码模式 - 保留中文、英文、数字、常用符号和emoji
+            r'[^\x20-\x7e\u4e00-\u9fff\u3000-\u303f\uff00-\uffef\U0001f300-\U0001f9ff\u2600-\u26ff\u2700-\u27bf\u0080-\u00ff\n\r\t]+': '',
+        }
+        
+        cleaned_text = text
+        for pattern, replacement in replacements.items():
+            cleaned_text = re.sub(pattern, replacement, cleaned_text)
+        
+        # 移除连续的空白字符（但保留换行）
+        cleaned_text = re.sub(r'[ \t]+', ' ', cleaned_text)
+        cleaned_text = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned_text)
+        
+        return cleaned_text.strip()
+
 class EnhancedTextBrowser(QTextBrowser):
     """增强的文本浏览器，支持高级markdown渲染"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.renderer = EnhancedMarkdownRenderer()
-        self.setOpenExternalLinks(False)  # 我们自己处理链接
+        
+        # 启用链接处理
+        self.setOpenExternalLinks(True)  # 允许外部链接直接打开
+        self.setOpenLinks(True)  # 启用链接打开功能
         self.anchorClicked.connect(self._handle_link_click)
         
         # 设置基础样式，包含中文字体
@@ -383,24 +417,43 @@ class EnhancedTextBrowser(QTextBrowser):
     def _handle_link_click(self, url: QUrl):
         """处理链接点击"""
         url_string = url.toString()
+        print(f"🔗 链接点击: {url_string}")  # 调试信息
         
-        if url.scheme() in ['http', 'https']:
-            # 外部链接用浏览器打开
-            QDesktopServices.openUrl(url)
-        elif url.scheme() == 'file':
-            # 本地文件链接
-            QDesktopServices.openUrl(url)
-        elif url.scheme() == 'mailto':
-            # 邮件链接
-            QDesktopServices.openUrl(url)
-        else:
-            # 内部锚点链接
-            fragment = url.fragment()
-            if fragment:
+        try:
+            if url.scheme() in ['http', 'https']:
+                # 外部链接用浏览器打开
+                print(f"🌐 打开外部链接: {url_string}")
+                QDesktopServices.openUrl(url)
+                return True
+            elif url.scheme() == 'file':
+                # 本地文件链接
+                print(f"📁 打开本地文件: {url_string}")
+                QDesktopServices.openUrl(url)
+                return True
+            elif url.scheme() == 'mailto':
+                # 邮件链接
+                print(f"📧 打开邮件: {url_string}")
+                QDesktopServices.openUrl(url)
+                return True
+            elif url_string.startswith('#'):
+                # 内部锚点链接
+                fragment = url_string.lstrip('#')
+                print(f"⚓ 跳转到锚点: {fragment}")
                 self.scrollToAnchor(fragment)
+                return True
             else:
-                # 可能是相对链接，尝试作为锚点处理
-                self.scrollToAnchor(url_string.lstrip('#'))
+                # 尝试作为HTTP链接处理（可能缺少协议）
+                if '.' in url_string and not url_string.startswith('#'):
+                    full_url = f"https://{url_string}" if not url_string.startswith(('http://', 'https://')) else url_string
+                    print(f"🔗 补全协议后打开: {full_url}")
+                    QDesktopServices.openUrl(QUrl(full_url))
+                    return True
+                else:
+                    print(f"❓ 未知链接类型: {url_string}")
+                    return False
+        except Exception as e:
+            print(f"❌ 链接处理错误: {e}")
+            return False
     
     def get_renderer_info(self) -> Dict[str, any]:
         """获取渲染器信息"""
