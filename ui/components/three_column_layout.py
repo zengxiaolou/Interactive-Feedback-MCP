@@ -524,8 +524,17 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _add_project_info_section(self, layout):
         """添加项目基础信息部分 - 增强版样式，使用实际项目数据"""
-        info_label = QLabel("🏗️ 项目基础")
-        info_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#2196F3', 'large'))
+        # 根据是否为调用方项目显示不同的标题
+        project_data = self.project_info
+        is_caller = project_data.get('is_caller_project', False)
+        
+        if is_caller:
+            info_label = QLabel("🎯 调用方项目")
+            info_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#4CAF50', 'large'))
+        else:
+            info_label = QLabel("🏗️ 当前项目 (MCP服务器)")
+            info_label.setStyleSheet(EnhancedGlassmorphismTheme.get_label_style('#FF9800', 'large'))
+        
         layout.addWidget(info_label)
         
         info_frame = QFrame()
@@ -582,8 +591,17 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _add_git_info_section(self, layout):
         """添加Git状态信息部分，使用实际Git数据"""
-        git_label = QLabel("🌿 Git状态")
-        git_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 10px;")
+        # 根据是否为调用方项目显示不同的Git标题
+        git_data = self.git_info
+        is_caller = git_data.get('is_caller_project', False)
+        
+        if is_caller:
+            git_label = QLabel("🌿 调用方Git状态")
+            git_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 10px;")
+        else:
+            git_label = QLabel("🌿 MCP服务器Git状态")
+            git_label.setStyleSheet("color: #FF9800; font-weight: bold; font-size: 13px; margin-top: 10px;")
+        
         layout.addWidget(git_label)
         
         git_frame = QFrame()
@@ -767,42 +785,125 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
 
     def _get_project_info(self):
-        """获取项目基础信息"""
+        """获取项目基础信息 - 优先获取调用方项目信息"""
         try:
-            cwd = os.getcwd()
+            # 尝试从环境变量获取调用方的工作目录
+            caller_cwd = os.environ.get('MCP_CALLER_CWD')
+            if caller_cwd and os.path.exists(caller_cwd):
+                cwd = caller_cwd
+            else:
+                # 尝试从父进程获取调用方目录
+                cwd = self._detect_caller_project_dir()
+                if not cwd:
+                    cwd = os.getcwd()
+            
             return {
                 "name": os.path.basename(cwd),
                 "path": cwd,
-                "files": len([f for f in os.listdir(cwd) if os.path.isfile(f)]) if os.path.exists(cwd) else 0
+                "files": len([f for f in os.listdir(cwd) if os.path.isfile(f)]) if os.path.exists(cwd) else 0,
+                "is_caller_project": cwd != os.getcwd()  # 标记是否为调用方项目
             }
         except:
-            return {"name": "unknown", "path": "unknown", "files": 0}
+            return {"name": "unknown", "path": "unknown", "files": 0, "is_caller_project": False}
+
+    def _detect_caller_project_dir(self):
+        """检测调用方项目目录"""
+        try:
+            import psutil
+            current_process = psutil.Process()
+            parent_process = current_process.parent()
+            
+            # 获取父进程的工作目录
+            if parent_process and hasattr(parent_process, 'cwd'):
+                parent_cwd = parent_process.cwd()
+                # 检查是否为有效的项目目录（包含常见项目文件）
+                if self._is_project_directory(parent_cwd):
+                    return parent_cwd
+            
+            # 如果父进程方法失败，尝试从命令行参数推断
+            import sys
+            for arg in sys.argv:
+                if arg.startswith('--project-dir='):
+                    project_dir = arg.split('=', 1)[1]
+                    if os.path.exists(project_dir):
+                        return project_dir
+            
+            return None
+        except:
+            return None
+    
+    def _is_project_directory(self, path):
+        """判断是否为项目目录"""
+        if not os.path.exists(path):
+            return False
+        
+        # 检查常见的项目标识文件
+        project_indicators = [
+            '.git', 'package.json', 'requirements.txt', 'pyproject.toml',
+            'Cargo.toml', 'go.mod', 'pom.xml', 'build.gradle',
+            '.gitignore', 'README.md', 'README.rst'
+        ]
+        
+        for indicator in project_indicators:
+            if os.path.exists(os.path.join(path, indicator)):
+                return True
+        
+        return False
+
+    def _get_caller_project_name(self):
+        """获取调用方项目名称用于窗口标题"""
+        project_info = self._get_project_info()
+        project_name = project_info.get('name', 'unknown')
+        is_caller = project_info.get('is_caller_project', False)
+        
+        if is_caller:
+            return project_name
+        else:
+            # 如果没有检测到调用方项目，显示MCP服务器项目名
+            return f"{project_name} (MCP Server)"
 
     def _get_git_info(self):
-        """获取Git状态信息"""
+        """获取Git状态信息 - 优先获取调用方项目的Git状态"""
         try:
-            # 获取当前分支
-            branch_result = subprocess.run(['git', 'branch', '--show-current'], 
-                                         capture_output=True, text=True, timeout=5)
-            branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "unknown"
+            # 获取项目目录
+            project_info = self._get_project_info()
+            project_dir = project_info.get('path', os.getcwd())
             
-            # 获取状态
-            status_result = subprocess.run(['git', 'status', '--porcelain'], 
-                                         capture_output=True, text=True, timeout=5)
-            modified_files = len(status_result.stdout.strip().split('\n')) if status_result.stdout.strip() else 0
+            # 在项目目录中执行Git命令
+            git_commands = [
+                (['git', 'branch', '--show-current'], 'branch'),
+                (['git', 'status', '--porcelain'], 'status'),
+                (['git', 'log', '-1', '--pretty=format:%s'], 'log')
+            ]
             
-            # 获取最后提交
-            log_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%s'], 
-                                      capture_output=True, text=True, timeout=5)
-            last_commit = log_result.stdout.strip() if log_result.returncode == 0 else "No commits"
+            results = {}
+            for cmd, key in git_commands:
+                try:
+                    result = subprocess.run(cmd, cwd=project_dir,
+                                          capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        results[key] = result.stdout.strip()
+                    else:
+                        results[key] = ""
+                except:
+                    results[key] = ""
+            
+            # 处理结果
+            branch = results.get('branch', 'unknown') or 'unknown'
+            status_output = results.get('status', '')
+            modified_files = len(status_output.split('\n')) if status_output.strip() else 0
+            last_commit = results.get('log', 'No commits') or 'No commits'
             
             return {
                 "branch": branch,
                 "modified_files": modified_files,
-                "last_commit": last_commit
+                "last_commit": last_commit,
+                "project_dir": project_dir,
+                "is_caller_project": project_info.get('is_caller_project', False)
             }
         except:
-            return {"branch": "unknown", "modified_files": 0, "last_commit": "unknown"}
+            return {"branch": "unknown", "modified_files": 0, "last_commit": "unknown", 
+                   "project_dir": "unknown", "is_caller_project": False}
 
     def _setup_shortcuts(self):
         """设置快捷键 - 根据PRD文档增强"""

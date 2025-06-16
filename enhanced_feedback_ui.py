@@ -14,6 +14,25 @@ import os
 import json
 import argparse
 
+# 强制设置UTF-8编码
+import locale
+import codecs
+
+# 设置默认编码
+if sys.platform.startswith('win'):
+    # Windows系统特殊处理
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+
+# 设置locale
+try:
+    locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
+except:
+    try:
+        locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+    except:
+        pass
+
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -35,10 +54,15 @@ def main():
     # 创建应用程序
     app = QApplication(sys.argv)
     
-    # 获取当前项目名称作为应用程序名称
-    project_name = os.path.basename(os.getcwd())
-    app_name = f"Interactive Feedback MCP - {project_name}"
-    app.setApplicationName(app_name)
+    # 强制设置Qt应用程序编码（PySide6中QTextCodec已弃用）
+    try:
+        # PySide6中不再需要QTextCodec，默认就是UTF-8
+        pass
+    except:
+        pass
+    
+    # 先设置临时应用程序名称，稍后会更新
+    app.setApplicationName("Interactive Feedback MCP")
     app.setApplicationVersion("2.0.0")
     
     # 设置应用程序图标（用于Dock显示）
@@ -77,9 +101,13 @@ def main():
     # 创建并显示UI
     ui = ThreeColumnFeedbackUI(args.prompt, predefined_options)
     
-    # 获取当前项目名称作为标题的一部分
-    project_name = os.path.basename(os.getcwd())
-    ui.setWindowTitle(f"Interactive Feedback MCP - {project_name}")
+    # 获取调用方项目名称作为标题的一部分
+    caller_project_name = ui._get_caller_project_name()
+    app_title = f"Interactive Feedback MCP - {caller_project_name}"
+    
+    # 更新应用程序名称和窗口标题
+    app.setApplicationName(app_title)
+    ui.setWindowTitle(app_title)
     
     # 运行UI并获取结果
     ui.show()

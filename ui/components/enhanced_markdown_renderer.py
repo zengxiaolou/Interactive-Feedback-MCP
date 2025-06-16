@@ -100,9 +100,14 @@ class EnhancedMarkdownRenderer:
     def _render_with_markdown(self, text: str) -> str:
         """使用python-markdown渲染"""
         try:
-            # 确保文本是正确的编码
+            # 强化编码处理
             if isinstance(text, bytes):
                 text = text.decode('utf-8', errors='replace')
+            elif not isinstance(text, str):
+                text = str(text)
+            
+            # 确保文本是有效的UTF-8
+            text = text.encode('utf-8', errors='replace').decode('utf-8')
             
             # 重置markdown实例
             self.md.reset()
@@ -110,11 +115,16 @@ class EnhancedMarkdownRenderer:
             # 渲染markdown
             html_content = self.md.convert(text)
             
+            # 确保HTML内容也是正确编码
+            if isinstance(html_content, bytes):
+                html_content = html_content.decode('utf-8', errors='replace')
+            
             # 包装在完整的HTML中
             full_html = f"""
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
                 <style>
                     {self._get_custom_css()}
                     {self.pygments_css}
@@ -134,9 +144,14 @@ class EnhancedMarkdownRenderer:
     
     def _render_basic(self, text: str) -> str:
         """基础渲染（回退方案）"""
-        # 确保文本是正确的编码
+        # 强化编码处理
         if isinstance(text, bytes):
             text = text.decode('utf-8', errors='replace')
+        elif not isinstance(text, str):
+            text = str(text)
+        
+        # 确保文本是有效的UTF-8
+        text = text.encode('utf-8', errors='replace').decode('utf-8')
             
         # 简单的文本到HTML转换
         html = text.replace('\n', '<br>')
@@ -148,6 +163,7 @@ class EnhancedMarkdownRenderer:
         <html>
         <head>
             <meta charset="utf-8">
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
             <style>{self._get_custom_css()}</style>
         </head>
         <body>
