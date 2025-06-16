@@ -78,6 +78,65 @@ def main():
     app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     
+    # 强制设置深色模式，不受系统主题影响
+    app.setStyle('Fusion')  # 使用Fusion样式避免系统主题影响
+    from PySide6.QtGui import QPalette, QColor
+    
+    # 设置强制深色调色板
+    dark_palette = QPalette()
+    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
+    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ToolTipBase, QColor(0, 0, 0))
+    dark_palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))
+    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+    
+    app.setPalette(dark_palette)
+    
+    # 禁用系统主题跟随，强制保持深色模式
+    try:
+        os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'  # 防止系统缩放影响
+        os.environ['QT_SCALE_FACTOR'] = '1'  # 固定缩放比例
+        # 禁用系统主题检测
+        app.setProperty("_q_noSystemThemeChange", True)
+    except Exception as e:
+        print(f"⚠️ 设置系统主题隔离失败: {e}")
+    
+    print("🌙 强制深色模式已启用，不受系统主题影响")
+    
+    # 进一步强化深色模式设置，防止系统主题覆盖
+    try:
+        # 强制设置所有可能的深色相关属性
+        app.setProperty("_q_unifiedTitleAndToolBarOnMac", False)
+        app.setProperty("_qt_mac_wants_layer", True)
+        
+        # 禁用所有可能的系统主题检测
+        from PySide6.QtCore import QSettings
+        settings = QSettings()
+        settings.setValue("appearance/color_scheme", "dark")
+        settings.setValue("appearance/force_dark_mode", True)
+        settings.sync()
+        
+        # 验证调色板是否正确应用
+        current_palette = app.palette()
+        window_color = current_palette.color(QPalette.Window)
+        if window_color.red() > 128:  # 如果仍然是浅色
+            print("⚠️ 检测到系统覆盖，重新应用深色调色板")
+            app.setPalette(dark_palette)  # 重新应用
+        
+        print(f"📊 最终Window背景色: {current_palette.color(QPalette.Window).name()}")
+        print(f"📊 最终Text文字色: {current_palette.color(QPalette.WindowText).name()}")
+        
+    except Exception as e:
+        print(f"⚠️ 强化深色模式设置时出现警告: {e}")
+    
     # 设置中文字体支持
     from PySide6.QtGui import QFont
     default_font = QFont()

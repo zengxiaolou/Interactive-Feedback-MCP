@@ -73,6 +73,9 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _setup_window(self):
         """设置窗口基本属性"""
+        # 强制检查和应用深色模式
+        self._force_dark_mode()
+        
         project_name = os.path.basename(os.getcwd())
         self.setWindowTitle(f"Interactive Feedback MCP - {project_name}")
         
@@ -91,6 +94,49 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         # 应用增强版毛玻璃主窗口样式
         self.setStyleSheet(EnhancedGlassmorphismTheme.get_main_window_style())
+        
+    def _force_dark_mode(self):
+        """强制应用深色模式，防止系统主题覆盖"""
+        try:
+            from PySide6.QtWidgets import QApplication
+            from PySide6.QtGui import QPalette, QColor
+            
+            app = QApplication.instance()
+            if app is None:
+                return
+                
+            print("🌙 在UI组件中强制启用深色模式")
+            
+            # 重新设置深色调色板
+            dark_palette = QPalette()
+            dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
+            dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
+            dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
+            dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+            dark_palette.setColor(QPalette.ToolTipBase, QColor(0, 0, 0))
+            dark_palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
+            dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))
+            dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+            dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
+            dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))
+            dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+            dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+            dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+            
+            app.setPalette(dark_palette)
+            
+            # 验证深色模式状态
+            current_palette = app.palette()
+            window_color = current_palette.color(QPalette.Window)
+            is_dark = window_color.red() < 128
+            
+            if is_dark:
+                print("✅ UI组件深色模式验证通过")
+            else:
+                print("⚠️ UI组件深色模式验证失败，需要进一步调试")
+                
+        except Exception as e:
+            print(f"⚠️ UI组件深色模式设置异常: {e}")
 
     def _load_settings(self):
         """加载设置"""
@@ -212,7 +258,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
             checkbox_frame = QFrame()
             checkbox_frame.setStyleSheet("""
                 QFrame {
-                    background: rgba(255, 255, 255, 0.03);
+                    background: #323a42;
                     border: 1px solid rgba(255, 255, 255, 0.1);
                     border-radius: 6px;
                     padding: 8px;
@@ -1000,12 +1046,14 @@ class ThreeColumnFeedbackUI(QMainWindow):
             self.splitter.setSizes(sizes)
     
     def _toggle_theme(self):
-        """切换主题"""
+        """切换主题 - 强制深色模式"""
         current_theme = self.config_manager.config.ui.theme
         available_themes = [
             ThemeType.ENHANCED_GLASSMORPHISM,
             ThemeType.MODERN_GLASSMORPHISM,
-            ThemeType.GLASSMORPHISM
+            ThemeType.GLASSMORPHISM,
+            ThemeType.DARK,
+            ThemeType.HIGH_CONTRAST
         ]
         
         # 找到当前主题的索引

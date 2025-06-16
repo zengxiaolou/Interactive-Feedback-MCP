@@ -30,16 +30,17 @@ class EnhancedGlassmorphismTheme:
     
     @classmethod
     def get_main_window_style(cls):
-        """主窗口样式 - 增强版毛玻璃效果"""
+        """主窗口样式 - 强制深色毛玻璃效果"""
         return f"""
         QMainWindow {{
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 rgba(10, 15, 25, 0.95),
-                stop:0.3 rgba(20, 30, 40, 0.92),
-                stop:0.7 rgba(15, 25, 35, 0.93),
-                stop:1 rgba(5, 10, 20, 0.96));
+                stop:0 rgba(15, 20, 30, 1.0),
+                stop:0.3 rgba(25, 35, 45, 1.0),
+                stop:0.7 rgba(20, 30, 40, 1.0),
+                stop:1 rgba(10, 15, 25, 1.0));
             border: 2px solid {cls.COLORS['border_primary']};
             border-radius: 20px;
+            color: {cls.COLORS['text_primary']};
         }}
         
         QMainWindow::title {{
@@ -48,32 +49,39 @@ class EnhancedGlassmorphismTheme:
             font-weight: 600;
             font-size: 14px;
         }}
+        
+        /* 强制所有子组件使用深色背景 */
+        QWidget {{
+            background-color: rgba(25, 30, 40, 1.0);
+            color: {cls.COLORS['text_primary']};
+        }}
         """
     
     @classmethod
     def get_panel_style(cls):
-        """面板样式 - 多层渐变背景"""
+        """面板样式 - 优化的深色毛玻璃背景（更亮更美观）"""
         return f"""
         QFrame {{
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 rgba(255, 255, 255, 0.18),
-                stop:0.2 rgba(255, 255, 255, 0.14),
-                stop:0.5 rgba(255, 255, 255, 0.12),
-                stop:0.8 rgba(255, 255, 255, 0.14),
-                stop:1 rgba(255, 255, 255, 0.10));
-            border: 1px solid {cls.COLORS['border_secondary']};
+                stop:0 rgba(60, 70, 80, 0.88),
+                stop:0.2 rgba(55, 65, 75, 0.85),
+                stop:0.5 rgba(50, 60, 70, 0.82),
+                stop:0.8 rgba(55, 65, 75, 0.85),
+                stop:1 rgba(60, 70, 80, 0.88));
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 16px;
             margin: 4px;
+            color: {cls.COLORS['text_primary']};
         }}
         
         QFrame:hover {{
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 rgba(255, 255, 255, 0.22),
-                stop:0.2 rgba(255, 255, 255, 0.18),
-                stop:0.5 rgba(255, 255, 255, 0.16),
-                stop:0.8 rgba(255, 255, 255, 0.18),
-                stop:1 rgba(255, 255, 255, 0.14));
-            border: 1px solid {cls.COLORS['border_primary']};
+                stop:0 rgba(70, 80, 90, 0.92),
+                stop:0.2 rgba(65, 75, 85, 0.90),
+                stop:0.5 rgba(60, 70, 80, 0.88),
+                stop:0.8 rgba(65, 75, 85, 0.90),
+                stop:1 rgba(70, 80, 90, 0.92));
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }}
         """
     
@@ -202,10 +210,10 @@ class EnhancedGlassmorphismTheme:
     
     @classmethod
     def get_checkbox_frame_style(cls):
-        """复选框容器样式 - 悬停动画"""
+        """复选框容器样式 - 用户指定背景色"""
         return f"""
         QFrame {{
-            background: rgba(255, 255, 255, 0.08);
+            background: #323a42;
             border: 1px solid {cls.COLORS['border_secondary']};
             border-radius: 8px;
             padding: 6px;
@@ -213,7 +221,7 @@ class EnhancedGlassmorphismTheme:
         }}
         
         QFrame:hover {{
-            background: rgba(255, 255, 255, 0.15);
+            background: #3a4249;
             border: 1px solid {cls.COLORS['primary']};
             transform: translateY(-1px);
         }}

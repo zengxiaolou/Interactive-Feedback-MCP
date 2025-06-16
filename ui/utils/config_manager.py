@@ -12,12 +12,11 @@ from PySide6.QtCore import QSettings, QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 class ThemeType(Enum):
-    """主题类型枚举"""
+    """主题类型枚举 - 强制深色模式"""
     GLASSMORPHISM = "glassmorphism"
     MODERN_GLASSMORPHISM = "modern_glassmorphism"
     ENHANCED_GLASSMORPHISM = "enhanced_glassmorphism"
     DARK = "dark"
-    LIGHT = "light"
     HIGH_CONTRAST = "high_contrast"
 
 class LanguageType(Enum):
@@ -299,14 +298,13 @@ class ConfigManager(QObject):
         print(f"🎬 动画效果: {'开启' if self.config.ui.enable_animations else '关闭'}")
     
     def get_available_themes(self) -> List[Dict[str, str]]:
-        """获取可用主题列表"""
+        """获取可用主题列表 - 强制深色模式"""
         return [
-            {"id": ThemeType.ENHANCED_GLASSMORPHISM.value, "name": "增强版毛玻璃", "description": "高对比度毛玻璃效果"},
-            {"id": ThemeType.MODERN_GLASSMORPHISM.value, "name": "现代毛玻璃", "description": "现代风格毛玻璃效果"},
-            {"id": ThemeType.GLASSMORPHISM.value, "name": "经典毛玻璃", "description": "经典毛玻璃效果"},
-            {"id": ThemeType.DARK.value, "name": "深色主题", "description": "深色界面主题"},
-            {"id": ThemeType.LIGHT.value, "name": "浅色主题", "description": "浅色界面主题"},
-            {"id": ThemeType.HIGH_CONTRAST.value, "name": "高对比度", "description": "高对比度主题"}
+            {"id": ThemeType.ENHANCED_GLASSMORPHISM.value, "name": "增强版毛玻璃", "description": "高对比度毛玻璃效果 - 深色模式"},
+            {"id": ThemeType.MODERN_GLASSMORPHISM.value, "name": "现代毛玻璃", "description": "现代风格毛玻璃效果 - 深色模式"},
+            {"id": ThemeType.GLASSMORPHISM.value, "name": "经典毛玻璃", "description": "经典毛玻璃效果 - 深色模式"},
+            {"id": ThemeType.DARK.value, "name": "深色主题", "description": "纯深色界面主题"},
+            {"id": ThemeType.HIGH_CONTRAST.value, "name": "高对比度", "description": "高对比度深色主题"}
         ]
     
     def get_available_languages(self) -> List[Dict[str, str]]:
@@ -364,7 +362,7 @@ class ThemeManager:
     
     @staticmethod
     def get_theme_style(theme_type: ThemeType) -> str:
-        """根据主题类型获取样式"""
+        """根据主题类型获取样式 - 强制深色模式"""
         if theme_type == ThemeType.ENHANCED_GLASSMORPHISM:
             from ..styles.enhanced_glassmorphism import EnhancedGlassmorphismTheme
             return EnhancedGlassmorphismTheme.get_main_window_style()
@@ -373,9 +371,17 @@ class ThemeManager:
             return ModernGlassmorphismTheme.get_main_window_style()
         elif theme_type == ThemeType.GLASSMORPHISM:
             from ..styles.glassmorphism import GlassmorphismStyles
-            return GlassmorphismStyles.get_main_window_style()
+            return GlassmorphismStyles.main_window()
+        elif theme_type == ThemeType.DARK:
+            # 使用增强版毛玻璃作为深色主题
+            from ..styles.enhanced_glassmorphism import EnhancedGlassmorphismTheme
+            return EnhancedGlassmorphismTheme.get_main_window_style()
+        elif theme_type == ThemeType.HIGH_CONTRAST:
+            # 使用增强版毛玻璃作为高对比度主题
+            from ..styles.enhanced_glassmorphism import EnhancedGlassmorphismTheme
+            return EnhancedGlassmorphismTheme.get_main_window_style()
         else:
-            # 默认使用增强版毛玻璃
+            # 默认使用增强版毛玻璃 (深色)
             from ..styles.enhanced_glassmorphism import EnhancedGlassmorphismTheme
             return EnhancedGlassmorphismTheme.get_main_window_style()
     
