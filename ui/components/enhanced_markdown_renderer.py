@@ -112,6 +112,9 @@ class EnhancedMarkdownRenderer:
             # 清理乱码字符
             text = self._clean_garbled_text(text)
             
+            # 清理标题中的非常规字符
+            text = self._clean_title_characters(text)
+            
             # 重置markdown实例
             self.md.reset()
             
@@ -363,29 +366,59 @@ class EnhancedMarkdownRenderer:
         """
 
     def _clean_garbled_text(self, text: str) -> str:
-        """清理乱码字符，替换为emoji或删除"""
+        """清理乱码字符，但保留所有有效Unicode字符"""
         import re
         
-        # 常见的乱码模式和替换
+        # 只清理真正的乱码字符，保留所有正常Unicode字符
         replacements = {
-            # 菱形问号等乱码字符
-            r'[�]+': '❓',
-            r'[\ufffd]+': '❓',
-            # 控制字符
-            r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]': '',
-            # 其他常见乱码模式 - 保留中文、英文、数字、常用符号和emoji
-            r'[^\x20-\x7e\u4e00-\u9fff\u3000-\u303f\uff00-\uffef\U0001f300-\U0001f9ff\u2600-\u26ff\u2700-\u27bf\u0080-\u00ff\n\r\t]+': '',
+            # 替换字符（菱形问号）
+            r'[�]+': '',
+            r'[\ufffd]+': '',
+            # 控制字符（但保留换行、制表符、回车）
+            r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]': '',
+            # 移除NULL字符
+            r'\x00': '',
         }
         
         cleaned_text = text
         for pattern, replacement in replacements.items():
             cleaned_text = re.sub(pattern, replacement, cleaned_text)
         
-        # 移除连续的空白字符（但保留换行）
+        # 规范化空白字符（但保留所有换行）
         cleaned_text = re.sub(r'[ \t]+', ' ', cleaned_text)
+        # 限制连续空行为最多2个
         cleaned_text = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned_text)
         
-        return cleaned_text.strip()
+        return cleaned_text
+    
+    def _clean_title_characters(self, text: str) -> str:
+        """清理标题中的非常规字符，保留中文、英文、数字、常用符号"""
+        import re
+        
+        # 匹配markdown标题行
+        def clean_title_line(match):
+            title_prefix = match.group(1)  # ### 等标题标记
+            title_content = match.group(2)  # 标题内容
+            
+            # 清理标题内容，保留中文、英文、数字、常用符号和emoji
+            cleaned_content = re.sub(
+                r'[^\u4e00-\u9fff\u3000-\u303f\uff00-\uffef'  # 中文字符范围
+                r'a-zA-Z0-9\s'  # 英文字母、数字、空格
+                r'\U0001f300-\U0001f9ff\u2600-\u26ff\u2700-\u27bf'  # emoji
+                r'!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>?/~`'  # 常用符号
+                r'（）【】《》""''：；，。？！—…·'  # 中文标点
+                r']+', '', title_content
+            )
+            
+            # 移除多余空格
+            cleaned_content = re.sub(r'\s+', ' ', cleaned_content).strip()
+            
+            return f"{title_prefix}{cleaned_content}"
+        
+        # 处理所有级别的markdown标题
+        text = re.sub(r'^(#{1,6}\s*)(.*)$', clean_title_line, text, flags=re.MULTILINE)
+        
+        return text
 
 class EnhancedTextBrowser(QTextBrowser):
     """增强的文本浏览器，支持高级markdown渲染"""
