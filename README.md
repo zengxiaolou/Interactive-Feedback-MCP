@@ -193,79 +193,96 @@ uv run enhanced_feedback_ui.py --prompt "测试消息" --output-file test.json
 - **📋 项目上下文记录** (自动记录项目信息和Git状态)
 - **🐛 错误详情追踪** (包含堆栈信息和上下文)
 - **👁️ 实时日志监控**
+- **🗂️ 项目分类日志** (按项目名称分类保存，便于多项目排查)
 
-### 📁 日志文件位置
+### 📁 日志文件结构
+
+#### 🔹 项目分类日志结构
+日志系统会根据项目名称自动创建分类目录：
 ```
 logs/
-├── interactive_feedback_mcp.log    # 主日志文件
-├── errors.log                      # 错误日志
-├── performance.log                  # 性能日志  
-└── project_context.log             # 项目上下文日志
+├── interactive_feedback_mcp.log        # 默认主日志
+├── performance.log                     # 默认性能日志
+├── errors.log                         # 默认错误日志
+├── project_context.log                # 默认项目上下文日志
+└── project_{项目名称}/                  # 项目专用日志目录
+    ├── interactive_feedback_mcp.log    # 项目主日志
+    ├── performance.log                 # 项目性能日志
+    ├── errors.log                     # 项目错误日志
+    └── project_context.log            # 项目上下文日志
 ```
 
-### 🛠️ 日志管理工具
+#### 🔹 项目检测机制
+系统通过以下方式自动检测项目上下文：
 
-使用 `manage_logs.py` 脚本管理日志：
+1. **环境变量检测** - 优先从 `PWD` 环境变量获取（最可靠）
+2. **当前工作目录** - 使用 `os.getcwd()` 获取当前目录
+3. **父进程检测** - 通过 `psutil` 从父进程获取工作目录
+4. **项目标识识别** - 检测常见项目文件（.git, package.json, requirements.txt, pyproject.toml, .cursorrules 等）
+
+### 🎛️ 日志管理工具
+使用 `manage_logs.py` 进行日志管理：
 
 ```bash
 # 查看日志摘要
 python manage_logs.py summary
 
-# 查看最近50行主日志
-python manage_logs.py view --type main --lines 50
+# 搜索特定项目的日志
+python manage_logs.py search "项目名称"
 
-# 查看错误日志
-python manage_logs.py view --type error
+# 实时监控日志（支持项目过滤）
+python manage_logs.py monitor --project="项目名称"
 
-# 搜索日志内容
-python manage_logs.py search "错误关键词" --type all
+# 清理旧日志
+python manage_logs.py cleanup --days=30
 
-# 分析错误统计
-python manage_logs.py analyze
-
-# 实时监控日志
-python manage_logs.py monitor
-
-# 清理30天前的日志
-python manage_logs.py cleanup --days 30
-
-# 导出日志文件
-python manage_logs.py export --output logs_backup.zip
-
-# 配置日志级别
-python manage_logs.py config --level DEBUG
+# 导出项目日志
+python manage_logs.py export --project="项目名称" --format=json
 ```
 
 ### ⚙️ 日志配置
-日志配置文件 `logging_config.json` 允许自定义：
-- 📝 日志级别和格式
-- 📦 文件大小和轮转设置
-- 🖥️ 控制台输出控制
-- ⏱️ 性能监控阈值
-- 🧹 自动清理策略
 
-### 🚨 排查问题
-使用日志系统排查问题：
+通过 `logging_config.json` 自定义配置：
 
-1. **查看错误日志**
-   ```bash
-   python manage_logs.py view --type error
-   ```
+```json
+{
+  "level": "INFO",
+  "project_based_logging": true,
+  "project_name": "默认项目名",
+  "console_enabled": true,
+  "console_level": "WARNING",
+  "performance_enabled": true,
+  "slow_query_threshold": 1.0,
+  "max_file_size": 10485760,
+  "backup_count": 5
+}
+```
 
-2. **分析性能问题**
-   ```bash
-   python manage_logs.py view --type performance
-   ```
+## 🖼️ 图片预览功能
 
-3. **检查项目上下文**
-   ```bash
-   python manage_logs.py view --type context
-   ```
+### 🎨 增强的图片处理
+项目现已支持完整的图片预览和管理功能：
 
-4. **搜索特定错误**
-   ```bash
-   python manage_logs.py search "UI启动失败" --type all
-   ```
+#### 🔹 图片预览特性
+- **📸 缩略图预览** - 在UI中显示图片缩略图
+- **🔍 点击放大** - 点击图片查看原始大小
+- **📊 图片信息** - 显示图片尺寸和详细信息
+- **🗑️ 删除功能** - 便捷的图片删除操作
+- **💫 响应式界面** - 支持不同屏幕尺寸自适应
+
+#### 🔹 预览功能详情
+1. **智能缩放** - 自动计算最佳显示尺寸
+2. **高DPI支持** - 完美支持Retina等高分辨率屏幕
+3. **键盘操作** - 支持ESC键关闭预览
+4. **居中显示** - 自动在父窗口中居中显示
+5. **毛玻璃效果** - 现代化的UI设计风格
+
+#### 🔹 使用方式
+- 粘贴图片到输入框中
+- 图片会自动显示在预览区域
+- 点击图片可查看原始大小
+- 点击删除按钮(×)可移除图片
+- 支持多图片同时预览和管理
 
 ## 📖 使用指南
 

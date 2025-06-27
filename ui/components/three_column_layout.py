@@ -11,9 +11,9 @@ from typing import Optional, List, TypedDict
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QCheckBox, QTextBrowser, QFrame,
-    QScrollArea, QApplication, QTextEdit, QSplitter, QGridLayout
+    QScrollArea, QApplication, QTextEdit, QSplitter, QGridLayout, QDialog
 )
-from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtCore import Qt, QSettings, QTimer, Signal as pyqtSignal
 from PySide6.QtGui import QIcon, QShortcut, QKeySequence, QFont, QPixmap
 
 from ..widgets.feedback_text_edit import FeedbackTextEdit
@@ -414,6 +414,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
             }
             QFrame:hover {
                 border: 1px solid rgba(255, 255, 255, 0.4);
+                background: rgba(255, 255, 255, 0.02);
             }
         """)
         
@@ -422,13 +423,14 @@ class ThreeColumnFeedbackUI(QMainWindow):
         frame_layout.setContentsMargins(0, 0, 0, 0)
         frame_layout.setSpacing(0)
         
-        # 创建图片标签
-        image_label = QLabel()
+        # 创建图片标签 - 可点击
+        image_label = ClickableImageLabel()
         image_label.setStyleSheet("border: none; background: transparent;")
         image_label.setScaledContents(False)
         image_label.setAlignment(Qt.AlignCenter)
         image_label.setMinimumSize(scaled_width, target_height)
         image_label.setMaximumSize(scaled_width, target_height)
+        image_label.setCursor(Qt.PointingHandCursor)  # 设置鼠标指针为手型
         
         # 缩放图片，保持宽高比
         scaled_pixmap = pixmap.scaled(
@@ -440,36 +442,36 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         # 支持高DPI屏幕
         device_pixel_ratio = QApplication.primaryScreen().devicePixelRatio()
-        if device_pixel_ratio > 1.0:
-            hires_scaled_width = int(scaled_width * device_pixel_ratio)
-            hires_target_height = int(target_height * device_pixel_ratio)
-            
-            hires_pixmap = pixmap.scaled(
-                hires_scaled_width,
-                hires_target_height,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            hires_pixmap.setDevicePixelRatio(device_pixel_ratio)
-            image_label.setPixmap(hires_pixmap)
-        else:
-            image_label.setPixmap(scaled_pixmap)
+        scaled_pixmap.setDevicePixelRatio(device_pixel_ratio)
+        image_label.setPixmap(scaled_pixmap)
         
-        # 删除按钮
+        # 保存原始图片到标签，用于放大显示
+        image_label.original_pixmap = pixmap
+        
+        # 连接点击事件到放大显示
+        image_label.clicked.connect(lambda: self._show_enlarged_image(pixmap))
+        
+        # 创建删除按钮
         delete_button = QPushButton("×")
-        delete_button.setFixedSize(20, 20)
-        delete_button.setCursor(Qt.PointingHandCursor)
         delete_button.setStyleSheet("""
             QPushButton {
-                background-color: rgba(255, 0, 0, 0.7);
+                background: rgba(255, 77, 77, 0.8);
                 color: white;
-                border-radius: 10px;
-                font-weight: bold;
-                font-size: 12px;
                 border: none;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: bold;
+                min-width: 16px;
+                max-width: 16px;
+                min-height: 16px;
+                max-height: 16px;
+                margin: 2px;
             }
             QPushButton:hover {
-                background-color: rgba(255, 0, 0, 0.9);
+                background: rgba(255, 77, 77, 1.0);
+            }
+            QPushButton:pressed {
+                background: rgba(200, 50, 50, 1.0);
             }
         """)
         
@@ -507,24 +509,14 @@ class ThreeColumnFeedbackUI(QMainWindow):
         frame_layout.addWidget(image_label, 0, 0)
         frame_layout.addWidget(delete_button, 0, 0, Qt.AlignTop | Qt.AlignRight)
         
-        # 添加到图片布局，确保在弹性空间之前插入
-        if self.images_layout.count() > 0:
-            # 找到弹性空间的索引
-            stretch_index = -1
-            for i in range(self.images_layout.count()):
-                if self.images_layout.itemAt(i).spacerItem():
-                    stretch_index = i
-                    break
-            
-            if stretch_index >= 0:
-                # 在弹性空间之前插入图片
-                self.images_layout.insertWidget(stretch_index, image_frame)
-            else:
-                # 如果没有找到弹性空间，直接添加到末尾
-                self.images_layout.addWidget(image_frame)
-        else:
-            # 第一张图片，直接添加
-            self.images_layout.addWidget(image_frame)
+        # 将图片帧插入到弹性空间前面
+        stretch_index = self.images_layout.count() - 1  # 弹性空间索引
+        self.images_layout.insertWidget(stretch_index, image_frame)
+
+    def _show_enlarged_image(self, pixmap):
+        """显示放大的图片对话框"""
+        dialog = ImagePreviewDialog(pixmap, self)
+        dialog.exec_()
 
     def _add_project_info_section(self, layout):
         """添加项目基础信息部分 - 增强版样式，使用实际项目数据"""
@@ -1323,3 +1315,163 @@ class ThreeColumnFeedbackUI(QMainWindow):
         """运行UI并返回结果"""
         self.show()
         return self.feedback_result 
+
+# 可点击的图片标签类
+class ClickableImageLabel(QLabel):
+    clicked = pyqtSignal()
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+# 图片预览对话框
+class ImagePreviewDialog(QDialog):
+    def __init__(self, pixmap, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("图片预览")
+        self.setModal(True)
+        self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
+        
+        # 获取屏幕尺寸
+        screen = QApplication.primaryScreen().geometry()
+        max_width = int(screen.width() * 0.8)
+        max_height = int(screen.height() * 0.8)
+        
+        # 计算图片显示尺寸，保持宽高比
+        original_width = pixmap.width()
+        original_height = pixmap.height()
+        
+        if original_width > max_width or original_height > max_height:
+            # 需要缩放
+            width_ratio = max_width / original_width
+            height_ratio = max_height / original_height
+            scale_ratio = min(width_ratio, height_ratio)
+            
+            display_width = int(original_width * scale_ratio)
+            display_height = int(original_height * scale_ratio)
+        else:
+            # 不需要缩放
+            display_width = original_width
+            display_height = original_height
+        
+        # 设置对话框尺寸
+        self.resize(display_width + 40, display_height + 80)  # 留一些边距
+        
+        # 创建布局
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        # 创建图片标签
+        image_label = QLabel()
+        image_label.setAlignment(Qt.AlignCenter)
+        image_label.setStyleSheet("""
+            QLabel {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        
+        # 缩放图片
+        scaled_pixmap = pixmap.scaled(
+            display_width, display_height,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+        
+        # 支持高DPI屏幕
+        device_pixel_ratio = QApplication.primaryScreen().devicePixelRatio()
+        scaled_pixmap.setDevicePixelRatio(device_pixel_ratio)
+        image_label.setPixmap(scaled_pixmap)
+        
+        # 添加图片信息标签
+        info_label = QLabel(f"原始尺寸: {original_width} × {original_height} 像素")
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setStyleSheet("""
+            QLabel {
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 12px;
+                background: none;
+                border: none;
+                padding: 5px;
+            }
+        """)
+        
+        # 创建按钮布局
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # 添加关闭按钮
+        close_button = QPushButton("关闭")
+        close_button.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.1);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 13px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.5);
+            }
+            QPushButton:pressed {
+                background: rgba(255, 255, 255, 0.3);
+            }
+        """)
+        close_button.clicked.connect(self.accept)
+        button_layout.addWidget(close_button)
+        button_layout.addStretch()
+        
+        # 添加到主布局
+        layout.addWidget(image_label)
+        layout.addWidget(info_label)
+        layout.addLayout(button_layout)
+        
+        # 设置对话框样式
+        self.setStyleSheet("""
+            QDialog {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 rgba(31, 31, 31, 0.95),
+                    stop: 0.5 rgba(45, 45, 45, 0.95),
+                    stop: 1 rgba(31, 31, 31, 0.95)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+            }
+        """)
+        
+        # 居中显示
+        self.center_on_parent()
+    
+    def center_on_parent(self):
+        """将对话框居中显示在父窗口上"""
+        if self.parent():
+            parent_geometry = self.parent().geometry()
+            dialog_geometry = self.geometry()
+            
+            x = parent_geometry.x() + (parent_geometry.width() - dialog_geometry.width()) // 2
+            y = parent_geometry.y() + (parent_geometry.height() - dialog_geometry.height()) // 2
+            
+            self.move(x, y)
+        else:
+            # 如果没有父窗口，则在屏幕中央显示
+            screen = QApplication.primaryScreen().geometry()
+            dialog_geometry = self.geometry()
+            
+            x = (screen.width() - dialog_geometry.width()) // 2
+            y = (screen.height() - dialog_geometry.height()) // 2
+            
+            self.move(x, y)
+    
+    def keyPressEvent(self, event):
+        """处理键盘事件"""
+        if event.key() == Qt.Key_Escape:
+            self.accept()
+        super().keyPressEvent(event) 

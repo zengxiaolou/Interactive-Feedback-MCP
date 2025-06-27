@@ -40,56 +40,124 @@ def _detect_caller_project_context():
             # 尝试获取调用方工作目录
             caller_cwd = None
             
-            # 方法1: 优先从环境变量获取（通常是最可靠的）
-            env_cwd = os.environ.get('PWD')
-            if env_cwd and os.path.exists(env_cwd) and _is_project_directory(env_cwd):
-                caller_cwd = env_cwd
-                logger.info(f"从PWD环境变量检测到项目: {env_cwd}")
+            # 方法1: 深度进程链检测
+            try:
+                import psutil
+                current_process = psutil.Process()
+                
+                # 遍历进程链，寻找真正的调用方
+                process_chain = []
+                temp_process = current_process
+                
+                for i in range(5):  # 最多检查5层父进程
+                    try:
+                        parent = temp_process.parent()
+                        if parent:
+                            process_info = {
+                                'pid': parent.pid,
+                                'name': parent.name(),
+                                'cwd': parent.cwd() if hasattr(parent, 'cwd') else None,
+                                'cmdline': ' '.join(parent.cmdline()[:3]) if hasattr(parent, 'cmdline') else None
+                            }
+                            process_chain.append(process_info)
+                            
+                            # 检查是否是项目目录
+                            if process_info['cwd'] and _is_project_directory(process_info['cwd']):
+                                # 确保不是我们自己的目录
+                                script_dir = os.path.dirname(os.path.abspath(__file__))
+                                if process_info['cwd'] != script_dir:
+                                    caller_cwd = process_info['cwd']
+                                    logger.info(f"从进程链检测到项目: {caller_cwd} (进程: {process_info['name']})")
+                                    break
+                            
+                            temp_process = parent
+                        else:
+                            break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError):
+                        break
+                
+                # 记录完整的进程链用于调试
+                logger.info(f"进程链分析: {process_chain}")
+                
+            except (ImportError, Exception) as e:
+                logger.debug(f"进程链检测失败: {e}")
             
-            # 方法2: 使用当前工作目录
+            # 方法2: 环境变量全面检测
+            if not caller_cwd:
+                env_vars_to_check = ['PWD', 'OLDPWD', 'INIT_CWD', 'npm_config_user_config', 'PROJECT_ROOT']
+                
+                for env_var in env_vars_to_check:
+                    env_value = os.environ.get(env_var)
+                    if env_value and os.path.exists(env_value) and _is_project_directory(env_value):
+                        script_dir = os.path.dirname(os.path.abspath(__file__))
+                        if env_value != script_dir:
+                            caller_cwd = env_value
+                            logger.info(f"从环境变量{env_var}检测到项目: {env_value}")
+                            break
+                
+                # 记录所有环境变量用于调试
+                relevant_env = {k: v for k, v in os.environ.items() 
+                              if any(keyword in k.lower() for keyword in ['pwd', 'cwd', 'dir', 'path', 'project', 'root'])}
+                logger.info(f"相关环境变量: {relevant_env}")
+            
+            # 方法3: 文件系统智能检测
+            if not caller_cwd:
+                # 检查是否有临时文件或缓存文件指示调用方项目
+                temp_dirs = ['/tmp', os.path.expanduser('~/tmp'), os.path.expanduser('~/.cache')]
+                
+                for temp_dir in temp_dirs:
+                    if os.path.exists(temp_dir):
+                        try:
+                            # 查找最近修改的与项目相关的文件
+                            for root, dirs, files in os.walk(temp_dir):
+                                for file in files:
+                                    if any(keyword in file.lower() for keyword in ['cursor', 'mcp', 'project']):
+                                        filepath = os.path.join(root, file)
+                                        try:
+                                            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                                                content = f.read(1000)  # 只读前1000字符
+                                                # 查找路径模式
+                                                import re
+                                                path_matches = re.findall(r'/[^/\s]+/[^/\s]+/[^/\s\'"]+', content)
+                                                for path in path_matches:
+                                                    if os.path.exists(path) and _is_project_directory(path):
+                                                        caller_cwd = path
+                                                        logger.info(f"从临时文件检测到项目: {path}")
+                                                        break
+                                        except:
+                                            continue
+                                        if caller_cwd:
+                                            break
+                                if caller_cwd:
+                                    break
+                        except:
+                            continue
+                        if caller_cwd:
+                            break
+            
+            # 方法4: 当前工作目录检测
             if not caller_cwd:
                 current_cwd = os.getcwd()
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 
-                # 如果当前目录不是MCP服务器目录，且是有效项目目录
                 if current_cwd != script_dir and _is_project_directory(current_cwd):
                     caller_cwd = current_cwd
                     logger.info(f"从当前工作目录检测到项目: {current_cwd}")
-                # 即使是同一个目录，如果是有效项目目录也使用
                 elif _is_project_directory(current_cwd):
                     caller_cwd = current_cwd
                     logger.info(f"使用当前目录作为项目: {current_cwd}")
             
-            # 方法3: 尝试使用psutil从父进程获取
-            if not caller_cwd:
-                try:
-                    import psutil
-                    current_process = psutil.Process()
-                    parent_process = current_process.parent()
-                    if parent_process and hasattr(parent_process, 'cwd'):
-                        parent_cwd = parent_process.cwd()
-                        if _is_project_directory(parent_cwd):
-                            caller_cwd = parent_cwd
-                            logger.info(f"从父进程检测到项目: {parent_cwd}")
-                except (ImportError, psutil.NoSuchProcess, psutil.AccessDenied, Exception) as e:
-                    logger.debug(f"父进程检测失败: {e}")
-            
-            # 方法4: 回退到当前目录
-            if not caller_cwd:
-                caller_cwd = os.getcwd()
-                logger.info(f"使用当前目录作为回退: {caller_cwd}")
-            
             # 获取项目基本信息
-            project_name = os.path.basename(caller_cwd)
-            is_detected = _is_project_directory(caller_cwd)
+            project_name = os.path.basename(caller_cwd) if caller_cwd else 'unknown'
+            is_detected = _is_project_directory(caller_cwd) if caller_cwd else False
             
             result = {
-                'cwd': caller_cwd,
+                'cwd': caller_cwd or os.getcwd(),
                 'name': project_name,
                 'is_detected': is_detected
             }
             
-            logger.info(f"项目检测完成: 项目={project_name}, 路径={caller_cwd}, 有效={is_detected}")
+            logger.info(f"项目检测完成: 项目={project_name}, 路径={caller_cwd or os.getcwd()}, 有效={is_detected}")
             
             # 记录项目上下文
             log_project_context("project_detection", result)
@@ -198,6 +266,9 @@ def launch_feedback_ui(
             # 使用传入的参数覆盖自动检测的值
             caller_cwd = project_path or caller_context['cwd']
             effective_project_name = project_name or caller_context['name']
+            
+            # 设置日志系统的项目上下文
+            logging_manager.set_project_context(effective_project_name)
             
             logger.info(f"使用项目路径: {caller_cwd}, 项目名称: {effective_project_name}")
             

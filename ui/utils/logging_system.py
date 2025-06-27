@@ -34,6 +34,10 @@ class LogConfig:
     max_file_size: int = 10 * 1024 * 1024  # 10MB
     backup_count: int = 5
     
+    # 项目分类配置
+    project_based_logging: bool = True  # 是否启用按项目分类日志
+    project_name: str = "default"  # 当前项目名称
+    
     # 控制台配置
     console_enabled: bool = True
     console_level: str = "INFO"
@@ -72,14 +76,30 @@ class LoggerManager:
             self.performance_data = []
             self.error_count = 0
             self.warning_count = 0
+            self.current_project_name = "default"  # 当前项目名称
             self.initialized = True
             self._setup_logging()
+    
+    def _get_project_log_dir(self) -> Path:
+        """获取项目专用日志目录"""
+        base_log_dir = Path(self.config.log_dir)
+        if self.config.project_based_logging and self.current_project_name != "default":
+            # 清理项目名称，确保是有效的目录名
+            safe_project_name = "".join(c for c in self.current_project_name if c.isalnum() or c in ('-', '_')).strip('-_')
+            if safe_project_name:
+                project_log_dir = base_log_dir / f"project_{safe_project_name}"
+            else:
+                project_log_dir = base_log_dir / "project_unknown"
+        else:
+            project_log_dir = base_log_dir
+        
+        project_log_dir.mkdir(parents=True, exist_ok=True)
+        return project_log_dir
     
     def _setup_logging(self):
         """设置日志系统"""
         # 创建日志目录
-        log_dir = Path(self.config.log_dir)
-        log_dir.mkdir(exist_ok=True)
+        log_dir = self._get_project_log_dir()
         
         # 设置根日志级别
         logging.getLogger().setLevel(getattr(logging, self.config.level.upper()))
@@ -113,9 +133,60 @@ class LoggerManager:
         if self.config.project_context_enabled:
             self._setup_project_context_handler()
     
+    def set_project_context(self, project_name: str):
+        """设置当前项目上下文，重新配置日志文件位置"""
+        if project_name != self.current_project_name:
+            self.current_project_name = project_name
+            self.config.project_name = project_name
+            
+            # 清理现有的文件处理器
+            for handler_name in ['main', 'performance', 'error', 'project_context']:
+                if handler_name in self.handlers:
+                    old_handler = self.handlers[handler_name]
+                    # 从所有logger中移除旧处理器
+                    for logger in self.loggers.values():
+                        if old_handler in logger.handlers:
+                            logger.removeHandler(old_handler)
+                    old_handler.close()
+                    del self.handlers[handler_name]
+            
+            # 重新创建处理器
+            self._setup_main_handler()
+            if self.config.performance_enabled:
+                self._setup_performance_handler()
+            self._setup_error_handler()
+            if self.config.project_context_enabled:
+                self._setup_project_context_handler()
+            
+            # 重新添加处理器到已存在的logger
+            for logger in self.loggers.values():
+                # 清理现有处理器（避免重复）
+                for handler in logger.handlers[:]:
+                    logger.removeHandler(handler)
+                
+                # 添加主处理器
+                if 'main' in self.handlers:
+                    logger.addHandler(self.handlers['main'])
+                
+                # 添加控制台处理器
+                if 'console' in self.handlers:
+                    logger.addHandler(self.handlers['console'])
+                
+                # 错误级别的消息同时写入错误日志
+                if 'error' in self.handlers:
+                    logger.addHandler(self.handlers['error'])
+            
+            # 记录项目切换
+            self.log_project_context("project_switch", {
+                "new_project": project_name,
+                "log_dir": str(self._get_project_log_dir()),
+                "timestamp": datetime.now().isoformat()
+            })
+    
     def _setup_main_handler(self):
         """设置主日志文件处理器"""
-        main_log_path = Path(self.config.log_dir) / self.config.log_filename
+        log_dir = self._get_project_log_dir()
+        main_log_path = log_dir / self.config.log_filename
         
         # 使用RotatingFileHandler实现日志轮转
         handler = logging.handlers.RotatingFileHandler(
@@ -139,7 +210,7 @@ class LoggerManager:
     
     def _setup_performance_handler(self):
         """设置性能监控处理器"""
-        perf_log_path = Path(self.config.log_dir) / self.config.performance_filename
+        perf_log_path = self._get_project_log_dir() / self.config.performance_filename
         
         handler = logging.handlers.RotatingFileHandler(
             perf_log_path,
@@ -160,7 +231,7 @@ class LoggerManager:
     
     def _setup_error_handler(self):
         """设置错误处理器"""
-        error_log_path = Path(self.config.log_dir) / self.config.error_filename
+        error_log_path = self._get_project_log_dir() / self.config.error_filename
         
         handler = logging.handlers.RotatingFileHandler(
             error_log_path,
@@ -181,7 +252,7 @@ class LoggerManager:
     
     def _setup_project_context_handler(self):
         """设置项目上下文处理器"""
-        context_log_path = Path(self.config.log_dir) / self.config.project_context_filename
+        context_log_path = self._get_project_log_dir() / self.config.project_context_filename
         
         handler = logging.handlers.RotatingFileHandler(
             context_log_path,
@@ -304,7 +375,7 @@ class LoggerManager:
     def get_log_summary(self) -> Dict[str, Any]:
         """获取日志摘要"""
         log_files = {}
-        log_dir = Path(self.config.log_dir)
+        log_dir = self._get_project_log_dir()
         
         if log_dir.exists():
             for log_file in log_dir.glob("*.log"):
@@ -329,7 +400,7 @@ class LoggerManager:
     
     def cleanup_old_logs(self, days: int = 30):
         """清理旧日志文件"""
-        log_dir = Path(self.config.log_dir)
+        log_dir = self._get_project_log_dir()
         if not log_dir.exists():
             return
         
