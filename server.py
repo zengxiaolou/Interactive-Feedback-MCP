@@ -17,15 +17,153 @@ from pydantic import Field
 # The log_level is necessary for Cline to work: https://github.com/jlowin/fastmcp/issues/81
 mcp = FastMCP("Interactive Feedback MCP", log_level="ERROR")
 
+def _detect_caller_project_context():
+    """检测调用方项目上下文信息"""
+    try:
+        import psutil
+        current_process = psutil.Process()
+        
+        # 尝试获取调用方工作目录
+        caller_cwd = None
+        
+        # 方法1: 从父进程获取工作目录
+        try:
+            parent_process = current_process.parent()
+            if parent_process and hasattr(parent_process, 'cwd'):
+                parent_cwd = parent_process.cwd()
+                # 检查是否为有效的项目目录
+                if _is_project_directory(parent_cwd):
+                    caller_cwd = parent_cwd
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+        
+        # 方法2: 从环境变量获取（如果调用方已设置）
+        if not caller_cwd:
+            env_cwd = os.environ.get('PWD') or os.environ.get('OLDPWD')
+            if env_cwd and _is_project_directory(env_cwd):
+                caller_cwd = env_cwd
+        
+        # 方法3: 使用当前工作目录作为回退
+        if not caller_cwd:
+            current_cwd = os.getcwd()
+            # 如果当前目录不是MCP服务器目录，则可能是调用方目录
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            if current_cwd != script_dir and _is_project_directory(current_cwd):
+                caller_cwd = current_cwd
+        
+        # 获取项目基本信息
+        if caller_cwd:
+            project_name = os.path.basename(caller_cwd)
+            return {
+                'cwd': caller_cwd,
+                'name': project_name,
+                'is_detected': True
+            }
+        else:
+            return {
+                'cwd': os.getcwd(),
+                'name': 'unknown',
+                'is_detected': False
+            }
+            
+    except ImportError:
+        # 如果psutil不可用，使用基本方法
+        return {
+            'cwd': os.getcwd(),
+            'name': os.path.basename(os.getcwd()),
+            'is_detected': False
+        }
+    except Exception:
+        return {
+            'cwd': os.getcwd(),
+            'name': 'unknown',
+            'is_detected': False
+        }
+
+def _is_project_directory(path):
+    """判断是否为项目目录"""
+    if not os.path.exists(path):
+        return False
+    
+    # 检查常见的项目标识文件
+    project_indicators = [
+        '.git', 'package.json', 'requirements.txt', 'pyproject.toml',
+        'Cargo.toml', 'go.mod', 'pom.xml', 'build.gradle',
+        '.gitignore', 'README.md', 'README.rst', '.cursorrules'
+    ]
+    
+    for indicator in project_indicators:
+        if os.path.exists(os.path.join(path, indicator)):
+            return True
+    
+    return False
+
+def _get_caller_git_info(project_dir):
+    """获取调用方项目的Git信息"""
+    try:
+        git_commands = [
+            (['git', 'branch', '--show-current'], 'branch'),
+            (['git', 'status', '--porcelain'], 'status'),
+            (['git', 'log', '-1', '--pretty=format:%s'], 'last_commit'),
+            (['git', 'rev-parse', '--is-inside-work-tree'], 'is_git_repo')
+        ]
+        
+        git_info = {}
+        for cmd, key in git_commands:
+            try:
+                result = subprocess.run(cmd, cwd=project_dir,
+                                      capture_output=True, text=True, timeout=3)
+                if result.returncode == 0:
+                    git_info[key] = result.stdout.strip()
+                else:
+                    git_info[key] = ""
+            except:
+                git_info[key] = ""
+        
+        # 处理状态信息
+        status_output = git_info.get('status', '')
+        modified_files = len(status_output.split('\n')) if status_output.strip() else 0
+        
+        return {
+            'branch': git_info.get('branch', 'unknown') or 'unknown',
+            'modified_files': modified_files,
+            'last_commit': git_info.get('last_commit', 'No commits') or 'No commits',
+            'is_git_repo': git_info.get('is_git_repo') == 'true'
+        }
+    except:
+        return {
+            'branch': 'unknown',
+            'modified_files': 0,
+            'last_commit': 'unknown',
+            'is_git_repo': False
+        }
+
 def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None) -> dict[str, str]:
     # Create a temporary file for the feedback result
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         output_file = tmp.name
 
     try:
+        # 检测调用方项目上下文
+        caller_context = _detect_caller_project_context()
+        caller_cwd = caller_context['cwd']
+        
+        # 获取调用方Git信息
+        caller_git_info = _get_caller_git_info(caller_cwd)
+        
         # Get the path to enhanced_feedback_ui.py relative to this script
         script_dir = os.path.dirname(os.path.abspath(__file__))
         feedback_ui_path = os.path.join(script_dir, "enhanced_feedback_ui.py")
+
+        # 准备环境变量，传递调用方项目上下文
+        env = os.environ.copy()
+        env['MCP_CALLER_CWD'] = caller_cwd
+        env['MCP_CALLER_PROJECT_NAME'] = caller_context['name']
+        env['MCP_CALLER_IS_DETECTED'] = str(caller_context['is_detected'])
+        env['MCP_CALLER_GIT_BRANCH'] = caller_git_info['branch']
+        env['MCP_CALLER_GIT_MODIFIED_FILES'] = str(caller_git_info['modified_files'])
+        env['MCP_CALLER_GIT_LAST_COMMIT'] = caller_git_info['last_commit']
+        env['MCP_CALLER_IS_GIT_REPO'] = str(caller_git_info['is_git_repo'])
 
         # Run feedback_ui.py as a separate process
         # NOTE: There appears to be a bug in uv, so we need
@@ -45,7 +183,8 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
-            close_fds=True
+            close_fds=True,
+            env=env  # 传递包含调用方上下文的环境变量
         )
         if result.returncode != 0:
             raise Exception(f"Failed to launch feedback UI: {result.returncode}")

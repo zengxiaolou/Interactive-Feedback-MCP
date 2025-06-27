@@ -51,6 +51,34 @@ def main():
     
     args = parser.parse_args()
     
+    # 如果没有从server.py传递的环境变量，则自行检测调用方项目
+    if not os.environ.get('MCP_CALLER_CWD'):
+        print("🔍 未检测到MCP服务器传递的调用方信息，直接检测调用方项目...")
+        try:
+            # 导入server.py中的检测函数
+            from server import _detect_caller_project_context, _get_caller_git_info
+            
+            # 检测调用方项目上下文
+            caller_context = _detect_caller_project_context()
+            caller_git_info = _get_caller_git_info(caller_context['cwd'])
+            
+            # 设置环境变量，以便UI组件能够正确读取
+            os.environ['MCP_CALLER_CWD'] = caller_context['cwd']
+            os.environ['MCP_CALLER_PROJECT_NAME'] = caller_context['name']
+            os.environ['MCP_CALLER_IS_DETECTED'] = str(caller_context['is_detected'])
+            os.environ['MCP_CALLER_GIT_BRANCH'] = caller_git_info['branch']
+            os.environ['MCP_CALLER_GIT_MODIFIED_FILES'] = str(caller_git_info['modified_files'])
+            os.environ['MCP_CALLER_GIT_LAST_COMMIT'] = caller_git_info['last_commit']
+            os.environ['MCP_CALLER_IS_GIT_REPO'] = str(caller_git_info['is_git_repo'])
+            
+            print(f"✅ 已检测到调用方项目: {caller_context['name']} ({caller_context['cwd']})")
+            
+        except Exception as e:
+            print(f"⚠️ 调用方项目检测失败: {e}")
+            print("🔄 将使用当前工作目录作为项目信息")
+    else:
+        print(f"✅ 使用MCP服务器传递的调用方信息: {os.environ.get('MCP_CALLER_PROJECT_NAME')}")
+    
     # 创建应用程序
     app = QApplication(sys.argv)
     

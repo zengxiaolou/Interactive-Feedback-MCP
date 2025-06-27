@@ -592,19 +592,41 @@ class ThreeColumnFeedbackUI(QMainWindow):
         # 获取实际项目信息
         project_data = self.project_info
         
-        # 检测项目类型
-        project_type = "Python Package"
-        if os.path.exists("pyproject.toml"):
-            project_type = "Python Package (pyproject.toml)"
-        elif os.path.exists("requirements.txt"):
-            project_type = "Python Project"
-        elif os.path.exists("package.json"):
-            project_type = "Node.js Project"
+        # 获取项目路径
+        project_path = project_data.get("path", ".")
         
-        # 计算项目大小
+        # 检测项目类型（在正确的项目路径下）
+        project_type = "未知项目"
+        try:
+            if os.path.exists(os.path.join(project_path, "pyproject.toml")):
+                project_type = "Python Package (pyproject.toml)"
+            elif os.path.exists(os.path.join(project_path, "requirements.txt")):
+                project_type = "Python Project"
+            elif os.path.exists(os.path.join(project_path, "package.json")):
+                project_type = "Node.js Project"
+            elif os.path.exists(os.path.join(project_path, "Cargo.toml")):
+                project_type = "Rust Project"
+            elif os.path.exists(os.path.join(project_path, "go.mod")):
+                project_type = "Go Project"
+            elif os.path.exists(os.path.join(project_path, "pom.xml")):
+                project_type = "Java Project (Maven)"
+            elif os.path.exists(os.path.join(project_path, "build.gradle")):
+                project_type = "Java Project (Gradle)"
+            elif os.path.exists(os.path.join(project_path, ".cursorrules")):
+                project_type = "Cursor项目"
+            else:
+                # 检查是否为Git仓库
+                if os.path.exists(os.path.join(project_path, ".git")):
+                    project_type = "Git仓库"
+                else:
+                    project_type = "普通文件夹"
+        except:
+            project_type = "检测失败"
+        
+        # 计算项目大小（在正确的项目路径下）
         try:
             import subprocess
-            result = subprocess.run(['du', '-sh', '.'], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(['du', '-sh', project_path], capture_output=True, text=True, timeout=5)
             project_size = result.stdout.split()[0] if result.returncode == 0 else "未知"
         except:
             project_size = "未知"
@@ -659,26 +681,41 @@ class ThreeColumnFeedbackUI(QMainWindow):
         # 获取实际Git信息
         git_data = self.git_info
         
-        # 获取额外Git信息
+        # 获取额外Git信息（在正确的项目路径下）
+        project_dir = git_data.get("project_dir", ".")
+        data_source = git_data.get("data_source", "local_query")
+        
         try:
-            # 获取未跟踪文件数
-            untracked_result = subprocess.run(['git', 'ls-files', '--others', '--exclude-standard'], 
-                                            capture_output=True, text=True, timeout=5)
-            untracked_count = len(untracked_result.stdout.strip().split('\n')) if untracked_result.stdout.strip() else 0
-            
-            # 获取提交作者
-            author_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%an'], 
-                                         capture_output=True, text=True, timeout=5)
-            author = author_result.stdout.strip() if author_result.returncode == 0 else "未知"
-            
-            # 获取提交时间
-            time_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%ar'], 
-                                       capture_output=True, text=True, timeout=5)
-            commit_time = time_result.stdout.strip() if time_result.returncode == 0 else "未知"
+            if data_source == "mcp_server":
+                # 如果是从MCP服务器获取的数据，尝试补充本地查询
+                untracked_result = subprocess.run(['git', 'ls-files', '--others', '--exclude-standard'], 
+                                                cwd=project_dir, capture_output=True, text=True, timeout=5)
+                untracked_count = len(untracked_result.stdout.strip().split('\n')) if untracked_result.stdout.strip() else 0
+                
+                author_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%an'], 
+                                             cwd=project_dir, capture_output=True, text=True, timeout=5)
+                author = author_result.stdout.strip() if author_result.returncode == 0 else "MCP数据"
+                
+                time_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%ar'], 
+                                           cwd=project_dir, capture_output=True, text=True, timeout=5)
+                commit_time = time_result.stdout.strip() if time_result.returncode == 0 else "MCP数据"
+            else:
+                # 本地查询
+                untracked_result = subprocess.run(['git', 'ls-files', '--others', '--exclude-standard'], 
+                                                cwd=project_dir, capture_output=True, text=True, timeout=5)
+                untracked_count = len(untracked_result.stdout.strip().split('\n')) if untracked_result.stdout.strip() else 0
+                
+                author_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%an'], 
+                                             cwd=project_dir, capture_output=True, text=True, timeout=5)
+                author = author_result.stdout.strip() if author_result.returncode == 0 else "未知"
+                
+                time_result = subprocess.run(['git', 'log', '-1', '--pretty=format:%ar'], 
+                                           cwd=project_dir, capture_output=True, text=True, timeout=5)
+                commit_time = time_result.stdout.strip() if time_result.returncode == 0 else "未知"
         except:
             untracked_count = 0
-            author = "未知"
-            commit_time = "未知"
+            author = "查询失败"
+            commit_time = "查询失败"
         
         # 实际Git信息
         git_info = [
@@ -833,24 +870,48 @@ class ThreeColumnFeedbackUI(QMainWindow):
     def _get_project_info(self):
         """获取项目基础信息 - 优先获取调用方项目信息"""
         try:
-            # 尝试从环境变量获取调用方的工作目录
+            # 从环境变量获取调用方项目信息（由MCP服务器传递）
             caller_cwd = os.environ.get('MCP_CALLER_CWD')
+            caller_name = os.environ.get('MCP_CALLER_PROJECT_NAME', 'unknown')
+            is_detected = os.environ.get('MCP_CALLER_IS_DETECTED', 'false').lower() == 'true'
+            
             if caller_cwd and os.path.exists(caller_cwd):
-                cwd = caller_cwd
+                # 使用调用方项目信息
+                file_count = 0
+                try:
+                    file_count = len([f for f in os.listdir(caller_cwd) 
+                                    if os.path.isfile(os.path.join(caller_cwd, f))])
+                except:
+                    file_count = 0
+                
+                return {
+                    "name": caller_name,
+                    "path": caller_cwd,
+                    "files": file_count,
+                    "is_caller_project": True,
+                    "is_detected": is_detected
+                }
             else:
-                # 尝试从父进程获取调用方目录
+                # 回退到本地检测方法
                 cwd = self._detect_caller_project_dir()
                 if not cwd:
                     cwd = os.getcwd()
-            
-            return {
-                "name": os.path.basename(cwd),
-                "path": cwd,
-                "files": len([f for f in os.listdir(cwd) if os.path.isfile(f)]) if os.path.exists(cwd) else 0,
-                "is_caller_project": cwd != os.getcwd()  # 标记是否为调用方项目
-            }
+                
+                return {
+                    "name": os.path.basename(cwd),
+                    "path": cwd,
+                    "files": len([f for f in os.listdir(cwd) if os.path.isfile(f)]) if os.path.exists(cwd) else 0,
+                    "is_caller_project": cwd != os.getcwd(),
+                    "is_detected": False
+                }
         except:
-            return {"name": "unknown", "path": "unknown", "files": 0, "is_caller_project": False}
+            return {
+                "name": "unknown", 
+                "path": "unknown", 
+                "files": 0, 
+                "is_caller_project": False,
+                "is_detected": False
+            }
 
     def _detect_caller_project_dir(self):
         """检测调用方项目目录"""
@@ -911,45 +972,73 @@ class ThreeColumnFeedbackUI(QMainWindow):
     def _get_git_info(self):
         """获取Git状态信息 - 优先获取调用方项目的Git状态"""
         try:
-            # 获取项目目录
+            # 首先尝试从环境变量获取调用方Git信息（由MCP服务器传递）
+            caller_branch = os.environ.get('MCP_CALLER_GIT_BRANCH')
+            caller_modified = os.environ.get('MCP_CALLER_GIT_MODIFIED_FILES')
+            caller_commit = os.environ.get('MCP_CALLER_GIT_LAST_COMMIT')
+            caller_is_git = os.environ.get('MCP_CALLER_IS_GIT_REPO', 'false').lower() == 'true'
+            
+            # 获取项目信息
             project_info = self._get_project_info()
             project_dir = project_info.get('path', os.getcwd())
+            is_caller_project = project_info.get('is_caller_project', False)
             
-            # 在项目目录中执行Git命令
-            git_commands = [
-                (['git', 'branch', '--show-current'], 'branch'),
-                (['git', 'status', '--porcelain'], 'status'),
-                (['git', 'log', '-1', '--pretty=format:%s'], 'log')
-            ]
-            
-            results = {}
-            for cmd, key in git_commands:
-                try:
-                    result = subprocess.run(cmd, cwd=project_dir,
-                                          capture_output=True, text=True, timeout=5)
-                    if result.returncode == 0:
-                        results[key] = result.stdout.strip()
-                    else:
+            if caller_branch and is_caller_project:
+                # 使用MCP服务器传递的Git信息
+                return {
+                    "branch": caller_branch if caller_branch != 'unknown' else 'unknown',
+                    "modified_files": int(caller_modified) if caller_modified and caller_modified.isdigit() else 0,
+                    "last_commit": caller_commit if caller_commit != 'unknown' else 'No commits',
+                    "project_dir": project_dir,
+                    "is_caller_project": is_caller_project,
+                    "is_git_repo": caller_is_git,
+                    "data_source": "mcp_server"
+                }
+            else:
+                # 回退到本地Git命令查询
+                git_commands = [
+                    (['git', 'branch', '--show-current'], 'branch'),
+                    (['git', 'status', '--porcelain'], 'status'),
+                    (['git', 'log', '-1', '--pretty=format:%s'], 'log')
+                ]
+                
+                results = {}
+                for cmd, key in git_commands:
+                    try:
+                        result = subprocess.run(cmd, cwd=project_dir,
+                                              capture_output=True, text=True, timeout=5)
+                        if result.returncode == 0:
+                            results[key] = result.stdout.strip()
+                        else:
+                            results[key] = ""
+                    except:
                         results[key] = ""
-                except:
-                    results[key] = ""
-            
-            # 处理结果
-            branch = results.get('branch', 'unknown') or 'unknown'
-            status_output = results.get('status', '')
-            modified_files = len(status_output.split('\n')) if status_output.strip() else 0
-            last_commit = results.get('log', 'No commits') or 'No commits'
-            
-            return {
-                "branch": branch,
-                "modified_files": modified_files,
-                "last_commit": last_commit,
-                "project_dir": project_dir,
-                "is_caller_project": project_info.get('is_caller_project', False)
-            }
+                
+                # 处理结果
+                branch = results.get('branch', 'unknown') or 'unknown'
+                status_output = results.get('status', '')
+                modified_files = len(status_output.split('\n')) if status_output.strip() else 0
+                last_commit = results.get('log', 'No commits') or 'No commits'
+                
+                return {
+                    "branch": branch,
+                    "modified_files": modified_files,
+                    "last_commit": last_commit,
+                    "project_dir": project_dir,
+                    "is_caller_project": is_caller_project,
+                    "is_git_repo": branch != 'unknown',
+                    "data_source": "local_query"
+                }
         except:
-            return {"branch": "unknown", "modified_files": 0, "last_commit": "unknown", 
-                   "project_dir": "unknown", "is_caller_project": False}
+            return {
+                "branch": "unknown", 
+                "modified_files": 0, 
+                "last_commit": "unknown", 
+                "project_dir": "unknown", 
+                "is_caller_project": False,
+                "is_git_repo": False,
+                "data_source": "error"
+            }
 
     def _setup_shortcuts(self):
         """设置快捷键 - 根据PRD文档增强"""
