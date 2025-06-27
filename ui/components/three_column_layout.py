@@ -76,8 +76,9 @@ class ThreeColumnFeedbackUI(QMainWindow):
         # 强制检查和应用深色模式
         self._force_dark_mode()
         
-        project_name = os.path.basename(os.getcwd())
-        self.setWindowTitle(f"Interactive Feedback MCP - {project_name}")
+        # 使用调用方项目名称作为窗口标题
+        caller_project_name = self._get_caller_project_name()
+        self.setWindowTitle(f"Interactive Feedback MCP - {caller_project_name}")
         
         # 设置应用图标
         if icon_manager.is_available():
@@ -248,50 +249,7 @@ class ThreeColumnFeedbackUI(QMainWindow):
                 self.option_checkboxes.append(checkbox)
                 layout.addWidget(checkbox_frame)
         
-        # 添加一些默认的智能推荐选项
-        default_options = [
-            "🔄 结束本轮对话",
-            "💬 结束本轮对话"
-        ]
-        
-        for i, option in enumerate(default_options, len(self.predefined_options) + 1):
-            checkbox_frame = QFrame()
-            checkbox_frame.setStyleSheet("""
-                QFrame {
-                    background: #323a42;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 6px;
-                    padding: 8px;
-                    margin: 2px 0px;
-                }
-            """)
-            
-            checkbox_layout = QHBoxLayout(checkbox_frame)
-            checkbox_layout.setContentsMargins(8, 5, 8, 5)
-            
-            number_label = QLabel(f"{i}.")
-            number_label.setStyleSheet("color: #666; font-size: 12px;")
-            number_label.setFixedWidth(20)
-            
-            checkbox = QCheckBox(option)
-            checkbox.setStyleSheet("""
-                QCheckBox {
-                    color: #999;
-                    spacing: 8px;
-                    padding: 5px;
-                }
-                QCheckBox::indicator {
-                    width: 16px;
-                    height: 16px;
-                    border-radius: 3px;
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                    background: rgba(255, 255, 255, 0.05);
-                }
-            """)
-            
-            checkbox_layout.addWidget(number_label)
-            checkbox_layout.addWidget(checkbox)
-            layout.addWidget(checkbox_frame)
+        # 移除重复的默认结束选项，让用户专注于具体的操作选项
         
         # 提示文本
         hint_label = QLabel("💡 提示：您可以选择多个选项进行组合操作")

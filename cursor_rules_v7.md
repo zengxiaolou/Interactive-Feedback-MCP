@@ -28,6 +28,61 @@
 ### 🎯 请选择您希望的处理方式
 ```
 
+## 📁 强制项目信息传递规则
+
+### ⚠️ 重要：每次调用 interactive_feedback 工具时必须传递项目信息
+
+**必须包含的参数：**
+- `project_path`: 当前工作目录的绝对路径
+- `project_name`: 项目名称或目录名
+- `git_branch`: 当前Git分支（如果是Git项目）
+- `category`: 操作类别（bug|feature|review|performance|docs|test|deploy|other）
+- `priority`: 优先级（1-5，其中5最高）
+
+### 📝 标准调用格式
+```python
+interactive_feedback(
+    message="您的分析和问题描述",
+    predefined_options=["选项1", "选项2", ...],
+    project_path=os.getcwd(),  # 获取当前工作目录
+    project_name=os.path.basename(os.getcwd()),  # 获取项目名称
+    git_branch="当前分支名",  # 如果适用
+    priority=3,  # 1-5的优先级
+    category="feature",  # 操作类别
+    context_data={  # 额外上下文信息
+        "file_count": "文件数量",
+        "current_task": "当前任务描述"
+    }
+)
+```
+
+### 🔍 项目信息获取方法
+```python
+import os
+import subprocess
+
+# 获取项目路径和名称
+project_path = os.getcwd()
+project_name = os.path.basename(project_path)
+
+# 获取Git分支（如果是Git项目）
+try:
+    git_branch = subprocess.run(['git', 'branch', '--show-current'], 
+                               capture_output=True, text=True).stdout.strip()
+except:
+    git_branch = "unknown"
+```
+
+### ⚡ 快速调用示例
+```
+请使用以下信息调用 interactive_feedback：
+- project_path: /path/to/current/project
+- project_name: my-awesome-project  
+- git_branch: main
+- priority: 4
+- category: feature
+```
+
 ## 🔚 超严格会话结束条件
 
 ### ✅ 唯一允许结束的情况

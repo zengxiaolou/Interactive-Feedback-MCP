@@ -1,0 +1,60 @@
+{
+  "log_config": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "date_format": "%Y-%m-%d %H:%M:%S",
+    "log_dir": "logs",
+    "log_filename": "interactive_feedback_mcp.log",
+    "max_file_size": 10485760,
+    "backup_count": 5,
+    "console_enabled": true,
+    "console_level": "WARNING",
+    "console_format": "%(levelname)s - %(name)s - %(message)s",
+    "performance_enabled": true,
+    "performance_filename": "performance.log",
+    "slow_query_threshold": 1.0,
+    "error_filename": "errors.log",
+    "error_detail_enabled": true,
+    "project_context_enabled": true,
+    "project_context_filename": "project_context.log"
+  },
+  "logger_settings": {
+    "mcp_server": {
+      "level": "INFO",
+      "handlers": ["main", "console", "performance", "error", "project_context"]
+    },
+    "enhanced_ui": {
+      "level": "INFO", 
+      "handlers": ["main", "console", "performance", "error"]
+    },
+    "ui_components": {
+      "level": "DEBUG",
+      "handlers": ["main", "error"]
+    },
+    "performance": {
+      "level": "INFO",
+      "handlers": ["performance", "console"]
+    },
+    "project_detection": {
+      "level": "INFO",
+      "handlers": ["main", "project_context", "console"]
+    }
+  },
+  "development_mode": {
+    "enabled": false,
+    "verbose_logging": false,
+    "log_file_operations": false,
+    "log_ui_events": false
+  },
+  "production_mode": {
+    "enabled": true,
+    "minimal_console_output": true,
+    "error_reporting": true,
+    "performance_monitoring": true
+  },
+  "cleanup_settings": {
+    "auto_cleanup_enabled": true,
+    "cleanup_interval_days": 30,
+    "max_log_size_mb": 100
+  }
+} 

@@ -18,6 +18,10 @@ import argparse
 import locale
 import codecs
 
+# 导入日志系统
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ui.utils.logging_system import init_logging, get_logger, log_project_context, log_performance
+
 # 设置默认编码
 if sys.platform.startswith('win'):
     # Windows系统特殊处理
@@ -43,41 +47,72 @@ from ui.components.three_column_layout import ThreeColumnFeedbackUI
 def main():
     """主函数 - 处理命令行参数并运行增强版UI"""
     
-    # 解析命令行参数
-    parser = argparse.ArgumentParser(description='Enhanced Interactive Feedback UI')
-    parser.add_argument('--prompt', required=True, help='The prompt message to display')
-    parser.add_argument('--output-file', required=True, help='Output file for the result')
-    parser.add_argument('--predefined-options', default='', help='Predefined options separated by |||')
+    # 初始化日志系统
+    init_logging({
+        'level': 'INFO',
+        'console_enabled': True,
+        'console_level': 'WARNING',  # UI只在控制台显示警告和错误
+        'performance_enabled': True,
+        'project_context_enabled': True
+    })
     
-    args = parser.parse_args()
+    logger = get_logger('enhanced_ui')
+    logger.info("增强版反馈UI启动")
     
-    # 如果没有从server.py传递的环境变量，则自行检测调用方项目
-    if not os.environ.get('MCP_CALLER_CWD'):
-        print("🔍 未检测到MCP服务器传递的调用方信息，直接检测调用方项目...")
-        try:
-            # 导入server.py中的检测函数
-            from server import _detect_caller_project_context, _get_caller_git_info
+    with log_performance("enhanced_ui_main", "ui_startup"):
+        
+        # 解析命令行参数
+        parser = argparse.ArgumentParser(description='Enhanced Interactive Feedback UI')
+        parser.add_argument('--prompt', required=True, help='The prompt message to display')
+        parser.add_argument('--output-file', required=True, help='Output file for the result')
+        parser.add_argument('--predefined-options', default='', help='Predefined options separated by |||')
+        
+        args = parser.parse_args()
+        logger.info(f"命令行参数解析完成: prompt长度={len(args.prompt)}")
+        
+        # 如果没有从server.py传递的环境变量，则自行检测调用方项目
+        if not os.environ.get('MCP_CALLER_CWD'):
+            logger.info("未检测到MCP服务器传递的调用方信息，直接检测调用方项目")
+            try:
+                # 导入server.py中的检测函数
+                from server import _detect_caller_project_context, _get_caller_git_info
+                
+                # 检测调用方项目上下文
+                caller_context = _detect_caller_project_context()
+                caller_git_info = _get_caller_git_info(caller_context['cwd'])
+                
+                # 设置环境变量，以便UI组件能够正确读取
+                os.environ['MCP_CALLER_CWD'] = caller_context['cwd']
+                os.environ['MCP_CALLER_PROJECT_NAME'] = caller_context['name']
+                os.environ['MCP_CALLER_IS_DETECTED'] = str(caller_context['is_detected'])
+                os.environ['MCP_CALLER_GIT_BRANCH'] = caller_git_info['branch']
+                os.environ['MCP_CALLER_GIT_MODIFIED_FILES'] = str(caller_git_info['modified_files'])
+                os.environ['MCP_CALLER_GIT_LAST_COMMIT'] = caller_git_info['last_commit']
+                os.environ['MCP_CALLER_IS_GIT_REPO'] = str(caller_git_info['is_git_repo'])
+                
+                logger.info(f"已检测到调用方项目: {caller_context['name']} ({caller_context['cwd']})")
+                
+                # 记录项目上下文
+                log_project_context("ui_startup_project_detection", {
+                    'project': caller_context,
+                    'git': caller_git_info
+                })
+                
+            except Exception as e:
+                logger.error(f"调用方项目检测失败: {e}")
+                logger.info("将使用当前工作目录作为项目信息")
+        else:
+            project_name = os.environ.get('MCP_CALLER_PROJECT_NAME')
+            logger.info(f"使用MCP服务器传递的调用方信息: {project_name}")
             
-            # 检测调用方项目上下文
-            caller_context = _detect_caller_project_context()
-            caller_git_info = _get_caller_git_info(caller_context['cwd'])
-            
-            # 设置环境变量，以便UI组件能够正确读取
-            os.environ['MCP_CALLER_CWD'] = caller_context['cwd']
-            os.environ['MCP_CALLER_PROJECT_NAME'] = caller_context['name']
-            os.environ['MCP_CALLER_IS_DETECTED'] = str(caller_context['is_detected'])
-            os.environ['MCP_CALLER_GIT_BRANCH'] = caller_git_info['branch']
-            os.environ['MCP_CALLER_GIT_MODIFIED_FILES'] = str(caller_git_info['modified_files'])
-            os.environ['MCP_CALLER_GIT_LAST_COMMIT'] = caller_git_info['last_commit']
-            os.environ['MCP_CALLER_IS_GIT_REPO'] = str(caller_git_info['is_git_repo'])
-            
-            print(f"✅ 已检测到调用方项目: {caller_context['name']} ({caller_context['cwd']})")
-            
-        except Exception as e:
-            print(f"⚠️ 调用方项目检测失败: {e}")
-            print("🔄 将使用当前工作目录作为项目信息")
-    else:
-        print(f"✅ 使用MCP服务器传递的调用方信息: {os.environ.get('MCP_CALLER_PROJECT_NAME')}")
+            # 记录从服务器传递的项目上下文
+            log_project_context("ui_startup_server_context", {
+                'project_name': project_name,
+                'project_cwd': os.environ.get('MCP_CALLER_CWD'),
+                'git_branch': os.environ.get('MCP_CALLER_GIT_BRANCH'),
+                'priority': os.environ.get('MCP_FEEDBACK_PRIORITY'),
+                'category': os.environ.get('MCP_FEEDBACK_CATEGORY')
+            })
     
     # 创建应用程序
     app = QApplication(sys.argv)
@@ -192,9 +227,9 @@ def main():
     caller_project_name = ui._get_caller_project_name()
     app_title = f"Interactive Feedback MCP - {caller_project_name}"
     
-    # 更新应用程序名称和窗口标题
+    # 更新应用程序名称
     app.setApplicationName(app_title)
-    ui.setWindowTitle(app_title)
+    # 窗口标题已在ThreeColumnFeedbackUI的_setup_window中设置
     
     # 运行UI并获取结果
     ui.show()

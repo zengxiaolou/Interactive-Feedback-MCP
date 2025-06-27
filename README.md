@@ -182,6 +182,91 @@ uv run enhanced_feedback_ui.py --prompt "测试消息" --output-file test.json
 }
 ```
 
+## 📄 日志系统
+
+### 🔍 日志功能
+本项目现已集成完整的日志系统，支持：
+
+- **📊 多级别日志记录** (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- **🔄 文件轮转和大小控制** (默认10MB轮转，保留5个备份)
+- **⚡ 性能监控** (记录操作耗时，识别慢操作)
+- **📋 项目上下文记录** (自动记录项目信息和Git状态)
+- **🐛 错误详情追踪** (包含堆栈信息和上下文)
+- **👁️ 实时日志监控**
+
+### 📁 日志文件位置
+```
+logs/
+├── interactive_feedback_mcp.log    # 主日志文件
+├── errors.log                      # 错误日志
+├── performance.log                  # 性能日志  
+└── project_context.log             # 项目上下文日志
+```
+
+### 🛠️ 日志管理工具
+
+使用 `manage_logs.py` 脚本管理日志：
+
+```bash
+# 查看日志摘要
+python manage_logs.py summary
+
+# 查看最近50行主日志
+python manage_logs.py view --type main --lines 50
+
+# 查看错误日志
+python manage_logs.py view --type error
+
+# 搜索日志内容
+python manage_logs.py search "错误关键词" --type all
+
+# 分析错误统计
+python manage_logs.py analyze
+
+# 实时监控日志
+python manage_logs.py monitor
+
+# 清理30天前的日志
+python manage_logs.py cleanup --days 30
+
+# 导出日志文件
+python manage_logs.py export --output logs_backup.zip
+
+# 配置日志级别
+python manage_logs.py config --level DEBUG
+```
+
+### ⚙️ 日志配置
+日志配置文件 `logging_config.json` 允许自定义：
+- 📝 日志级别和格式
+- 📦 文件大小和轮转设置
+- 🖥️ 控制台输出控制
+- ⏱️ 性能监控阈值
+- 🧹 自动清理策略
+
+### 🚨 排查问题
+使用日志系统排查问题：
+
+1. **查看错误日志**
+   ```bash
+   python manage_logs.py view --type error
+   ```
+
+2. **分析性能问题**
+   ```bash
+   python manage_logs.py view --type performance
+   ```
+
+3. **检查项目上下文**
+   ```bash
+   python manage_logs.py view --type context
+   ```
+
+4. **搜索特定错误**
+   ```bash
+   python manage_logs.py search "UI启动失败" --type all
+   ```
+
 ## 📖 使用指南
 
 ### 基础用法
