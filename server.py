@@ -138,7 +138,16 @@ def _get_caller_git_info(project_dir):
             'is_git_repo': False
         }
 
-def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None) -> dict[str, str]:
+def launch_feedback_ui(
+    summary: str, 
+    predefinedOptions: list[str] | None = None,
+    project_path: str | None = None,
+    project_name: str | None = None,
+    git_branch: str | None = None,
+    priority: int = 3,
+    category: str = "general",
+    context_data: dict | None = None
+) -> dict[str, str]:
     # Create a temporary file for the feedback result
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         output_file = tmp.name
@@ -146,10 +155,14 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
     try:
         # 检测调用方项目上下文
         caller_context = _detect_caller_project_context()
-        caller_cwd = caller_context['cwd']
+        
+        # 使用传入的参数覆盖自动检测的值
+        caller_cwd = project_path or caller_context['cwd']
+        effective_project_name = project_name or caller_context['name']
         
         # 获取调用方Git信息
         caller_git_info = _get_caller_git_info(caller_cwd)
+        effective_git_branch = git_branch or caller_git_info['branch']
         
         # Get the path to enhanced_feedback_ui.py relative to this script
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -158,12 +171,21 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
         # 准备环境变量，传递调用方项目上下文
         env = os.environ.copy()
         env['MCP_CALLER_CWD'] = caller_cwd
-        env['MCP_CALLER_PROJECT_NAME'] = caller_context['name']
+        env['MCP_CALLER_PROJECT_NAME'] = effective_project_name
         env['MCP_CALLER_IS_DETECTED'] = str(caller_context['is_detected'])
-        env['MCP_CALLER_GIT_BRANCH'] = caller_git_info['branch']
+        env['MCP_CALLER_GIT_BRANCH'] = effective_git_branch
         env['MCP_CALLER_GIT_MODIFIED_FILES'] = str(caller_git_info['modified_files'])
         env['MCP_CALLER_GIT_LAST_COMMIT'] = caller_git_info['last_commit']
         env['MCP_CALLER_IS_GIT_REPO'] = str(caller_git_info['is_git_repo'])
+        
+        # 添加新的扩展参数
+        env['MCP_FEEDBACK_PRIORITY'] = str(priority)
+        env['MCP_FEEDBACK_CATEGORY'] = category
+        
+        # 添加额外的上下文数据
+        if context_data:
+            import json
+            env['MCP_FEEDBACK_CONTEXT_DATA'] = json.dumps(context_data, ensure_ascii=False)
 
         # Run feedback_ui.py as a separate process
         # NOTE: There appears to be a bug in uv, so we need
@@ -203,12 +225,37 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
 def interactive_feedback(
     message: str = Field(description="The specific question for the user"),
     predefined_options: list = Field(default=None, description="Predefined options for the user to choose from (optional)"),
+    project_path: str = Field(default=None, description="Override project path (optional, auto-detected if not provided)"),
+    project_name: str = Field(default=None, description="Override project name (optional, auto-detected if not provided)"),
+    git_branch: str = Field(default=None, description="Override git branch name (optional, auto-detected if not provided)"),
+    priority: int = Field(default=3, description="Priority level 1-5 (1=lowest, 5=highest, default=3)"),
+    category: str = Field(default="general", description="Category: bug|feature|review|performance|docs|test|deploy|other"),
+    context_data: dict = Field(default=None, description="Additional context data as key-value pairs"),
 ) -> Tuple[str | Image, ...]:
     """
     Request interactive feedback from the user.
+    
+    Args:
+        message: The specific question for the user
+        predefined_options: Predefined options for the user to choose from (optional)
+        project_path: Override project path (optional, auto-detected if not provided)
+        project_name: Override project name (optional, auto-detected if not provided)  
+        git_branch: Override git branch name (optional, auto-detected if not provided)
+        priority: Priority level 1-5 (1=lowest, 5=highest, default=3)
+        category: Category: bug|feature|review|performance|docs|test|deploy|other
+        context_data: Additional context data as key-value pairs
     """
     predefined_options_list = predefined_options if isinstance(predefined_options, list) else None
-    result_dict = launch_feedback_ui(message, predefined_options_list)
+    result_dict = launch_feedback_ui(
+        message, 
+        predefined_options_list,
+        project_path,
+        project_name,
+        git_branch,
+        priority,
+        category,
+        context_data
+    )
 
     txt: str = result_dict.get("interactive_feedback", "").strip()
     img_b64_list: List[str] = result_dict.get("images", [])
