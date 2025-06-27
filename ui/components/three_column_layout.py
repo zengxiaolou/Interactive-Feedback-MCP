@@ -321,9 +321,6 @@ class ThreeColumnFeedbackUI(QMainWindow):
         # Git状态信息
         self._add_git_info_section(layout)
         
-        # 反馈参数信息
-        self._add_feedback_params_section(layout)
-        
         # 项目活动信息
         self._add_project_activity_section(layout)
         
@@ -755,115 +752,6 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         layout.addWidget(git_frame)
 
-    def _add_feedback_params_section(self, layout):
-        """添加反馈参数信息部分，显示传递给Interactive Feedback的额外参数"""
-        params_label = QLabel("⚙️ 反馈参数")
-        params_label.setStyleSheet("color: #2196F3; font-weight: bold; font-size: 13px; margin-top: 10px;")
-        layout.addWidget(params_label)
-        
-        params_frame = QFrame()
-        params_frame.setStyleSheet("""
-            QFrame {
-                background: rgba(33, 150, 243, 0.1);
-                border: 1px solid rgba(33, 150, 243, 0.2);
-                border-radius: 8px;
-                padding: 8px;
-                margin: 2px 0px;
-            }
-        """)
-        
-        params_layout = QVBoxLayout(params_frame)
-        params_layout.setSpacing(5)
-        
-        # 从环境变量获取反馈参数
-        priority = os.environ.get('MCP_FEEDBACK_PRIORITY', '3')
-        category = os.environ.get('MCP_FEEDBACK_CATEGORY', 'general')
-        context_data_str = os.environ.get('MCP_FEEDBACK_CONTEXT_DATA', '')
-        
-        # 解析上下文数据
-        context_data = {}
-        if context_data_str:
-            try:
-                import json
-                context_data = json.loads(context_data_str)
-            except:
-                context_data = {"解析错误": context_data_str[:50] + "..."}
-        
-        # 优先级映射
-        priority_map = {
-            '1': '🔵 最低',
-            '2': '🟢 较低', 
-            '3': '🟡 普通',
-            '4': '🟠 较高',
-            '5': '🔴 最高'
-        }
-        
-        # 分类映射
-        category_map = {
-            'bug': '🐛 Bug修复',
-            'feature': '✨ 新功能',
-            'review': '👀 代码审查',
-            'performance': '⚡ 性能优化',
-            'docs': '📚 文档',
-            'test': '🧪 测试',
-            'deploy': '🚀 部署',
-            'other': '📦 其他',
-            'general': '🔧 通用'
-        }
-        
-        # 反馈参数信息
-        params_info = [
-            ("优先级:", priority_map.get(priority, f"🔸 {priority}")),
-            ("分类:", category_map.get(category, f"📋 {category}"))
-        ]
-        
-        # 添加上下文数据
-        if context_data:
-            params_info.append(("上下文:", f"{len(context_data)}个键值对"))
-        
-        for label, value in params_info:
-            row = QHBoxLayout()
-            label_widget = QLabel(label)
-            label_widget.setStyleSheet("color: #ccc; font-size: 11px;")
-            label_widget.setFixedWidth(50)
-            
-            value_widget = QLabel(value)
-            value_widget.setStyleSheet("color: #fff; font-size: 11px;")
-            value_widget.setWordWrap(True)
-            
-            row.addWidget(label_widget)
-            row.addWidget(value_widget)
-            row.addStretch()
-            params_layout.addLayout(row)
-        
-        # 如果有上下文数据，显示详细信息
-        if context_data and len(context_data) > 0:
-            context_label = QLabel("📋 上下文详情:")
-            context_label.setStyleSheet("color: #ccc; font-size: 10px; margin-top: 5px;")
-            params_layout.addWidget(context_label)
-            
-            for key, value in list(context_data.items())[:3]:  # 最多显示3个
-                context_row = QHBoxLayout()
-                key_widget = QLabel(f"{key}:")
-                key_widget.setStyleSheet("color: #aaa; font-size: 10px;")
-                key_widget.setFixedWidth(60)
-                
-                value_str = str(value)[:30] + "..." if len(str(value)) > 30 else str(value)
-                value_widget = QLabel(value_str)
-                value_widget.setStyleSheet("color: #ddd; font-size: 10px;")
-                value_widget.setWordWrap(True)
-                
-                context_row.addWidget(key_widget)
-                context_row.addWidget(value_widget)
-                context_row.addStretch()
-                params_layout.addLayout(context_row)
-            
-            if len(context_data) > 3:
-                more_label = QLabel(f"... 还有 {len(context_data) - 3} 个")
-                more_label.setStyleSheet("color: #888; font-size: 10px; font-style: italic;")
-                params_layout.addWidget(more_label)
-        
-        layout.addWidget(params_frame)
 
     def _add_project_activity_section(self, layout):
         """添加项目活动信息部分，使用实际项目数据"""
