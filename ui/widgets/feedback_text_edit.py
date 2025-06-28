@@ -1,5 +1,5 @@
 # Custom Text Edit Widget for Interactive Feedback MCP
-# 自定义文本编辑器组件
+# 自定义文本编辑器组件 - 输入法位置智能调整版
 
 import base64
 import uuid
@@ -11,88 +11,163 @@ from PySide6.QtCore import Qt, Signal, QBuffer, QIODevice, QRect, QPoint, QTimer
 from PySide6.QtGui import QKeyEvent, QPixmap, QInputMethodEvent, QTextCursor
 
 class FeedbackTextEdit(QTextEdit):
-    """支持图片粘贴和智能输入法处理的自定义文本编辑器"""
+    """支持图片粘贴和输入法位置智能调整的自定义文本编辑器"""
     
     # 图片处理常量
     DEFAULT_MAX_IMAGE_WIDTH = 1624
     DEFAULT_MAX_IMAGE_HEIGHT = 1624
     DEFAULT_IMAGE_FORMAT = "PNG"
     
-    # 输入法处理常量
-    IME_CANDIDATE_HEIGHT = 120  # 输入法候选框预估高度
-    IME_ADJUST_MARGIN = 20      # 调整边距
-    IME_CHECK_DELAY = 50        # 输入法状态检查延迟(ms)
+    # 输入法位置调整常量
+    IME_OFFSET_Y = 25           # 输入法框向下偏移像素
+    IME_SAFETY_MARGIN = 10      # 安全边距
+    IME_UPDATE_DELAY = 10       # 位置更新延迟(ms)
 
     # 定义类级别的信号
     image_pasted = Signal(QPixmap)
-    ime_position_changed = Signal(QRect)  # 输入法位置变化信号
-    ime_visibility_changed = Signal(bool)  # 输入法显示/隐藏信号
-    request_window_adjustment = Signal(int, int)  # 请求窗口位置调整信号
+    ime_position_adjusted = Signal(QRect)  # 输入法位置调整信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.image_data: List[Dict[str, Any]] = []
+        self.setAcceptDrops(True)
         
-        # 输入法状态跟踪
+        # 输入法状态追踪
         self.ime_active = False
-        self.ime_rect = QRect()
-        self.original_window_pos: Optional[QPoint] = None
-        self.ime_adjustment_applied = False
+        self.original_cursor_rect = QRect()
+        self.adjusted_ime_rect = QRect()
         
-        # 延迟检查定时器
-        self.ime_check_timer = QTimer()
-        self.ime_check_timer.setSingleShot(True)
-        self.ime_check_timer.timeout.connect(self._check_ime_position)
+        # 设置定时器用于延迟更新输入法位置
+        self.ime_update_timer = QTimer()
+        self.ime_update_timer.setSingleShot(True)
+        self.ime_update_timer.timeout.connect(self._update_ime_position)
         
-        # 启用输入法查询
-        self.setAttribute(Qt.WA_InputMethodEnabled, True)
-        
-        print("✅ FeedbackTextEdit初始化完成，输入法处理已启用")
+        print("🎯 FeedbackTextEdit初始化完成 - 输入法位置智能调整模式")
 
     def inputMethodEvent(self, event: QInputMethodEvent):
-        """处理输入法事件 - 核心输入法遮挡检测"""
+        """处理输入法事件，实现候选词位置智能调整"""
         try:
-            # 调用父类处理
+            # 调用父类处理基础输入法事件
             super().inputMethodEvent(event)
             
-            # 检测输入法状态变化
-            was_active = self.ime_active
-            is_active = bool(event.preeditString() or event.commitString())
+            # 检查是否有输入法组合文本或提交文本
+            has_preedit = len(event.preeditString()) > 0
+            has_commit = len(event.commitString()) > 0
             
-            if is_active != was_active:
-                self.ime_active = is_active
-                self.ime_visibility_changed.emit(is_active)
-                print(f"🎯 输入法状态变化: {'激活' if is_active else '关闭'}")
-            
-            # 如果输入法激活，延迟检查位置
-            if is_active:
-                self.ime_check_timer.start(self.IME_CHECK_DELAY)
-            else:
-                self._restore_window_position()
+            if has_preedit:
+                # 输入法激活，开始组合输入
+                if not self.ime_active:
+                    self.ime_active = True
+                    print("🎯 输入法激活 - 开始位置调整")
+                
+                # 延迟更新输入法位置，避免频繁调整
+                self.ime_update_timer.start(self.IME_UPDATE_DELAY)
+                
+            elif has_commit:
+                # 文本提交，但输入法可能仍然活跃
+                print("📝 文本已提交")
+                
+            elif self.ime_active and not has_preedit:
+                # 输入法关闭
+                self.ime_active = False
+                print("🔄 输入法关闭 - 恢复正常位置")
+                self._reset_ime_position()
                 
         except Exception as e:
             print(f"❌ 输入法事件处理错误: {e}")
 
+    def _update_ime_position(self):
+        """更新输入法位置 - 实现候选词框下偏移"""
+        try:
+            if not self.ime_active:
+                return
+                
+            # 获取当前光标位置
+            cursor_rect = self.cursorRect()
+            if cursor_rect.isNull():
+                return
+                
+            # 记录原始光标位置
+            self.original_cursor_rect = cursor_rect
+            
+            # 计算调整后的输入法显示位置
+            # 将候选词框位置向下偏移，避免遮挡正在编辑的文本
+            adjusted_rect = QRect(cursor_rect)
+            adjusted_rect.moveTop(cursor_rect.bottom() + self.IME_OFFSET_Y)
+            
+            # 确保调整后的位置在控件范围内
+            widget_rect = self.rect()
+            if adjusted_rect.bottom() > widget_rect.bottom():
+                # 如果下偏移超出控件边界，则向上偏移
+                adjusted_rect.moveTop(cursor_rect.top() - self.IME_OFFSET_Y - 30)
+            
+            self.adjusted_ime_rect = adjusted_rect
+            
+            # 设置输入法微焦点位置
+            self._set_ime_micro_focus(adjusted_rect)
+            
+            # 发送位置调整信号
+            self.ime_position_adjusted.emit(adjusted_rect)
+            
+            print(f"🎯 输入法位置已调整: 原始({cursor_rect.x()},{cursor_rect.y()}) → 调整后({adjusted_rect.x()},{adjusted_rect.y()})")
+            
+        except Exception as e:
+            print(f"❌ 输入法位置更新错误: {e}")
+
+    def _set_ime_micro_focus(self, rect: QRect):
+        """设置输入法微焦点位置"""
+        try:
+            # 将相对位置转换为全局位置
+            global_rect = QRect(
+                self.mapToGlobal(rect.topLeft()),
+                rect.size()
+            )
+            
+            # 更新输入法微焦点
+            self.setAttribute(Qt.WA_InputMethodEnabled, True)
+            self.setInputMethodHints(Qt.ImhNone)
+            
+            # 触发输入法位置更新
+            if hasattr(self, 'inputMethodQuery'):
+                self.updateMicroFocus()
+                
+        except Exception as e:
+            print(f"⚠️ 设置输入法微焦点错误: {e}")
+
+    def _reset_ime_position(self):
+        """重置输入法位置到原始状态"""
+        try:
+            if not self.original_cursor_rect.isNull():
+                # 恢复到原始光标位置
+                self._set_ime_micro_focus(self.original_cursor_rect)
+                print("🔄 输入法位置已重置")
+                
+        except Exception as e:
+            print(f"❌ 输入法位置重置错误: {e}")
+
     def inputMethodQuery(self, query):
-        """提供输入法查询信息"""
+        """提供输入法查询信息 - 返回调整后的位置"""
         try:
             # PySide6中使用Qt.InputMethodQuery的枚举值
             from PySide6.QtCore import Qt
             
+            # 兼容性处理
             if hasattr(Qt, 'ImCursorRectangle'):
                 cursor_rect_query = Qt.ImCursorRectangle
                 micro_focus_query = getattr(Qt, 'ImMicroFocus', Qt.ImCursorRectangle)
                 selection_query = getattr(Qt, 'ImCurrentSelection', None)
             else:
-                # 使用Qt.InputMethodQuery枚举
                 cursor_rect_query = Qt.InputMethodQuery.ImCursorRectangle if hasattr(Qt.InputMethodQuery, 'ImCursorRectangle') else 1
                 micro_focus_query = getattr(Qt.InputMethodQuery, 'ImMicroFocus', cursor_rect_query) if hasattr(Qt, 'InputMethodQuery') else cursor_rect_query
                 selection_query = getattr(Qt.InputMethodQuery, 'ImCurrentSelection', None) if hasattr(Qt, 'InputMethodQuery') else None
             
             if query == cursor_rect_query or query == micro_focus_query:
-                # 返回光标矩形位置
-                cursor_rect = self.cursorRect()
-                return cursor_rect
+                # 如果输入法活跃且有调整位置，返回调整后的位置
+                if self.ime_active and not self.adjusted_ime_rect.isNull():
+                    return self.adjusted_ime_rect
+                else:
+                    # 否则返回正常的光标位置
+                    return self.cursorRect()
+                    
             elif selection_query and query == selection_query:
                 # 返回当前选择
                 return self.textCursor().selectedText()
@@ -107,262 +182,98 @@ class FeedbackTextEdit(QTextEdit):
             except:
                 return super().inputMethodQuery(query)
 
-    def _check_ime_position(self):
-        """检查输入法候选框位置并执行智能调整"""
-        try:
-            if not self.ime_active:
-                return
-                
-            # 获取光标位置
-            cursor_rect = self.cursorRect()
-            if cursor_rect.isNull():
-                return
-                
-            # 计算全局光标位置
-            global_cursor_pos = self.mapToGlobal(cursor_rect.bottomLeft())
-            
-            # 预估输入法候选框位置
-            ime_rect = QRect(
-                global_cursor_pos.x(),
-                global_cursor_pos.y(),
-                200,  # 预估宽度
-                self.IME_CANDIDATE_HEIGHT
-            )
-            
-            # 检测是否需要调整
-            if self._should_adjust_window(ime_rect):
-                adjustment = self._calculate_adjustment(ime_rect)
-                if adjustment != (0, 0):
-                    self._apply_window_adjustment(adjustment)
-                    print(f"🎯 应用窗口调整: x={adjustment[0]}, y={adjustment[1]}")
-            
-            # 更新输入法矩形并发射信号
-            self.ime_rect = ime_rect
-            self.ime_position_changed.emit(ime_rect)
-            
-        except Exception as e:
-            print(f"❌ 输入法位置检查错误: {e}")
-
-    def _should_adjust_window(self, ime_rect: QRect) -> bool:
-        """判断是否需要调整窗口位置"""
-        try:
-            main_window = self.window()
-            if not main_window:
-                return False
-                
-            # 获取主窗口几何信息
-            window_rect = main_window.geometry()
-            
-            # 检查输入法是否与窗口重叠
-            overlap = window_rect.intersected(ime_rect)
-            
-            # 如果重叠区域高度超过阈值，需要调整
-            return not overlap.isEmpty() and overlap.height() > 30
-            
-        except Exception as e:
-            print(f"❌ 窗口调整判断错误: {e}")
-            return False
-
-    def _calculate_adjustment(self, ime_rect: QRect) -> tuple[int, int]:
-        """计算最佳的窗口调整量"""
-        try:
-            main_window = self.window()
-            if not main_window:
-                return (0, 0)
-                
-            window_rect = main_window.geometry()
-            screen = QApplication.primaryScreen()
-            screen_rect = screen.availableGeometry()
-            
-            # 计算向上移动的距离
-            overlap_bottom = ime_rect.bottom()
-            window_bottom = window_rect.bottom()
-            
-            if overlap_bottom > window_bottom:
-                # 输入法在窗口下方，不需要调整
-                return (0, 0)
-            
-            # 计算需要向上移动的距离
-            move_up = ime_rect.height() + self.IME_ADJUST_MARGIN
-            
-            # 确保不会移出屏幕顶部
-            new_y = window_rect.y() - move_up
-            if new_y < screen_rect.y():
-                move_up = window_rect.y() - screen_rect.y()
-            
-            return (0, -move_up)
-            
-        except Exception as e:
-            print(f"❌ 调整量计算错误: {e}")
-            return (0, 0)
-
-    def _apply_window_adjustment(self, adjustment: tuple[int, int]):
-        """应用窗口位置调整"""
-        try:
-            main_window = self.window()
-            if not main_window or self.ime_adjustment_applied:
-                return
-                
-            # 保存原始位置
-            if self.original_window_pos is None:
-                self.original_window_pos = main_window.pos()
-            
-            # 计算新位置
-            current_pos = main_window.pos()
-            new_pos = QPoint(
-                current_pos.x() + adjustment[0],
-                current_pos.y() + adjustment[1]
-            )
-            
-            # 移动窗口
-            main_window.move(new_pos)
-            self.ime_adjustment_applied = True
-            
-            # 发射调整请求信号
-            self.request_window_adjustment.emit(adjustment[0], adjustment[1])
-            
-        except Exception as e:
-            print(f"❌ 窗口调整应用错误: {e}")
-
-    def _restore_window_position(self):
-        """恢复窗口原始位置"""
-        try:
-            if not self.ime_adjustment_applied or self.original_window_pos is None:
-                return
-                
-            main_window = self.window()
-            if main_window:
-                main_window.move(self.original_window_pos)
-                print("🔄 恢复窗口原始位置")
-            
-            self.original_window_pos = None
-            self.ime_adjustment_applied = False
-            
-        except Exception as e:
-            print(f"❌ 窗口位置恢复错误: {e}")
-
     def focusInEvent(self, event):
-        """获得焦点时重置输入法状态"""
+        """获得焦点时的处理"""
         super().focusInEvent(event)
-        self.ime_active = False
-        print("🎯 文本框获得焦点，重置输入法状态")
+        print("🎯 文本框获得焦点")
 
     def focusOutEvent(self, event):
-        """失去焦点时恢复窗口位置"""
+        """失去焦点时的处理"""
         super().focusOutEvent(event)
-        self._restore_window_position()
-        self.ime_active = False
-        print("🔄 文本框失去焦点，恢复窗口位置")
-
-    def keyPressEvent(self, event: QKeyEvent):
-        """处理键盘事件，支持Enter提交，Shift+Enter换行"""
-        if event.key() == Qt.Key_Return:
-            if event.modifiers() == Qt.ShiftModifier:
-                # Shift+Enter: 换行
-                super().keyPressEvent(event)
-                return
-            else:
-                # Enter: 提交操作
-                parent_window = self.window()
-                if hasattr(parent_window, '_submit_feedback'):
-                    parent_window._submit_feedback()
-                return
-        super().keyPressEvent(event)
-
-    def _convert_image_to_base64(self, image):
-        """将图片转换为Base64编码"""
-        try:
-            # 如果是QPixmap，直接使用
-            if isinstance(image, QPixmap):
-                pixmap = image
-            else:
-                # 尝试从其他格式转换
-                pixmap = QPixmap(image)
-
-            if pixmap.isNull():
-                print("无法加载图片")
-                return None
-
-            # 调整图片大小
-            if (pixmap.width() > self.DEFAULT_MAX_IMAGE_WIDTH or 
-                pixmap.height() > self.DEFAULT_MAX_IMAGE_HEIGHT):
-                pixmap = pixmap.scaled(
-                    self.DEFAULT_MAX_IMAGE_WIDTH,
-                    self.DEFAULT_MAX_IMAGE_HEIGHT,
-                    Qt.KeepAspectRatio,
-                    Qt.SmoothTransformation
-                )
-
-            # 转换为Base64
-            buffer = QBuffer()
-            buffer.open(QIODevice.WriteOnly)
-            pixmap.save(buffer, self.DEFAULT_IMAGE_FORMAT)
-            image_data = buffer.data()
-            buffer.close()
-
-            base64_data = base64.b64encode(image_data).decode('utf-8')
-            return base64_data
-
-        except Exception as e:
-            print(f"图片转换失败: {e}")
-            return None
-
-    def insertFromMimeData(self, source_data):
-        """处理粘贴操作，支持图片粘贴"""
-        if source_data.hasImage():
-            # 处理图片粘贴
-            image = source_data.imageData()
-            if image:
-                try:
-                    # 转换为QPixmap
-                    pixmap = QPixmap.fromImage(image)
-                    if not pixmap.isNull():
-                        # 转换为Base64并存储
-                        base64_data = self._convert_image_to_base64(pixmap)
-                        if base64_data:
-                            # 生成唯一ID和时间戳
-                            image_id = str(uuid.uuid4())
-                            timestamp = datetime.now().isoformat()
-
-                            # 存储图片数据
-                            self.image_data.append({
-                                'id': image_id,
-                                'base64': base64_data,
-                                'timestamp': timestamp,
-                                'format': self.DEFAULT_IMAGE_FORMAT,
-                                'width': pixmap.width(),
-                                'height': pixmap.height()
-                            })
-
-                            # 发射信号，通知主窗口显示图片预览
-                            self.image_pasted.emit(pixmap)
-
-                            print(f"图片已粘贴并转换为Base64，大小: {pixmap.width()}x{pixmap.height()}")
-                            return  # 不插入图片到文本中，只存储数据
-
-                except Exception as e:
-                    print(f"处理粘贴图片时出错: {e}")
-
-        # 处理其他类型的粘贴（文本等）
-        super().insertFromMimeData(source_data)
-
-    def get_image_data(self):
-        """获取所有图片数据的副本"""
-        return self.image_data.copy()
+        
+        # 重置输入法状态
+        if self.ime_active:
+            self.ime_active = False
+            self._reset_ime_position()
+            print("🔄 失去焦点，重置输入法状态")
 
     def get_ime_status(self) -> Dict[str, Any]:
-        """获取输入法状态信息（用于调试）"""
+        """获取当前输入法状态信息"""
         return {
             'active': self.ime_active,
-            'rect': {
-                'x': self.ime_rect.x(),
-                'y': self.ime_rect.y(),
-                'width': self.ime_rect.width(),
-                'height': self.ime_rect.height()
+            'original_rect': {
+                'x': self.original_cursor_rect.x(),
+                'y': self.original_cursor_rect.y(),
+                'width': self.original_cursor_rect.width(),
+                'height': self.original_cursor_rect.height()
             },
-            'adjustment_applied': self.ime_adjustment_applied,
-            'original_pos': {
-                'x': self.original_window_pos.x() if self.original_window_pos else None,
-                'y': self.original_window_pos.y() if self.original_window_pos else None
-            } if self.original_window_pos else None
-        } 
+            'adjusted_rect': {
+                'x': self.adjusted_ime_rect.x(),
+                'y': self.adjusted_ime_rect.y(),
+                'width': self.adjusted_ime_rect.width(),
+                'height': self.adjusted_ime_rect.height()
+            }
+        }
+
+    # ========================
+    # 图片粘贴功能保持不变
+    # ========================
+    def canInsertFromMimeData(self, source):
+        """检查是否可以从MIME数据插入内容"""
+        if source.hasImage():
+            return True
+        return super().canInsertFromMimeData(source)
+
+    def insertFromMimeData(self, source):
+        """从MIME数据插入内容，处理图片粘贴"""
+        if source.hasImage():
+            image = source.imageData()
+            if image and not image.isNull():
+                pixmap = QPixmap.fromImage(image)
+                if not pixmap.isNull():
+                    self.image_pasted.emit(pixmap)
+                    return
+        
+        # 处理其他类型的粘贴内容
+        super().insertFromMimeData(source)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """处理按键事件"""
+        # 检测Esc键来取消输入法
+        if event.key() == Qt.Key_Escape and self.ime_active:
+            self.ime_active = False
+            self._reset_ime_position()
+            print("⌨️ Esc键取消输入法")
+            return
+            
+        super().keyPressEvent(event)
+
+    def get_image_data_uri(self, pixmap: QPixmap, max_width: int = None, max_height: int = None, 
+                          image_format: str = None) -> str:
+        """将QPixmap转换为Base64数据URI"""
+        if max_width is None:
+            max_width = self.DEFAULT_MAX_IMAGE_WIDTH
+        if max_height is None:
+            max_height = self.DEFAULT_MAX_IMAGE_HEIGHT
+        if image_format is None:
+            image_format = self.DEFAULT_IMAGE_FORMAT
+
+        # 缩放图片
+        if pixmap.width() > max_width or pixmap.height() > max_height:
+            pixmap = pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+        # 转换为字节数组
+        byte_array = QByteArray()
+        buffer = QBuffer(byte_array)
+        buffer.open(QIODevice.WriteOnly)
+        pixmap.save(buffer, image_format)
+
+        # 编码为Base64
+        image_base64 = base64.b64encode(byte_array.data()).decode('utf-8')
+        mime_type = f"image/{image_format.lower()}"
+        
+        return f"data:{mime_type};base64,{image_base64}"
+
+    def get_images_list(self) -> List[str]:
+        """获取当前存储的图片列表"""
+        return getattr(self, '_images_list', []) 

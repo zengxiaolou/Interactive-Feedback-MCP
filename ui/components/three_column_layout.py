@@ -303,10 +303,8 @@ class ThreeColumnFeedbackUI(QMainWindow):
         # 连接图片粘贴信号到中间栏预览
         self.custom_input.image_pasted.connect(self._on_image_pasted)
         
-        # 🎯 连接输入法智能调整信号
-        self.custom_input.ime_visibility_changed.connect(self._on_ime_visibility_changed)
-        self.custom_input.ime_position_changed.connect(self._on_ime_position_changed)
-        self.custom_input.request_window_adjustment.connect(self._on_window_adjustment_requested)
+        # 🎯 连接输入法位置调整信号
+        self.custom_input.ime_position_adjusted.connect(self._on_ime_position_adjusted)
         
         layout.addWidget(self.custom_input)
         
@@ -532,60 +530,14 @@ class ThreeColumnFeedbackUI(QMainWindow):
             # 第一张图片，直接添加
             self.images_layout.addWidget(image_frame)
 
-    # 🎯 输入法智能调整处理方法
-    def _on_ime_visibility_changed(self, is_visible: bool):
-        """处理输入法显示/隐藏状态变化"""
+    # 🎯 输入法位置调整处理方法
+    def _on_ime_position_adjusted(self, adjusted_rect):
+        """处理输入法位置调整信号"""
         try:
-            if is_visible:
-                print("🎯 输入法激活，准备智能位置调整")
-                # 可以在这里添加额外的UI提示
-                self.setWindowTitle(f"{self.windowTitle()} - 输入法模式")
-            else:
-                print("🔄 输入法关闭，恢复正常模式")
-                # 恢复窗口标题
-                title = self.windowTitle().replace(" - 输入法模式", "")
-                self.setWindowTitle(title)
+            print(f"🎯 输入法位置已调整: 显示位置({adjusted_rect.x()}, {adjusted_rect.y()})")
+            print("✅ 候选词框已智能下移，避免遮挡正在编辑的文本")
         except Exception as e:
-            print(f"❌ 处理输入法可见性变化错误: {e}")
-
-    def _on_ime_position_changed(self, ime_rect):
-        """处理输入法位置变化"""
-        try:
-            print(f"📍 输入法位置更新: x={ime_rect.x()}, y={ime_rect.y()}, w={ime_rect.width()}, h={ime_rect.height()}")
-            # 这里可以添加实时位置显示或调试信息
-            # 例如在状态栏显示位置信息
-        except Exception as e:
-            print(f"❌ 处理输入法位置变化错误: {e}")
-
-    def _on_window_adjustment_requested(self, offset_x: int, offset_y: int):
-        """处理窗口位置调整请求"""
-        try:
-            print(f"🎯 收到窗口调整请求: x偏移={offset_x}, y偏移={offset_y}")
-            
-            # 获取当前窗口位置
-            current_pos = self.pos()
-            
-            # 计算新位置
-            new_x = current_pos.x() + offset_x
-            new_y = current_pos.y() + offset_y
-            
-            # 获取屏幕边界
-            screen = QApplication.primaryScreen()
-            screen_rect = screen.availableGeometry()
-            
-            # 确保窗口不会移出屏幕
-            new_x = max(screen_rect.left(), min(new_x, screen_rect.right() - self.width()))
-            new_y = max(screen_rect.top(), min(new_y, screen_rect.bottom() - self.height()))
-            
-            # 应用位置调整
-            from PySide6.QtCore import QPoint
-            new_pos = QPoint(new_x, new_y)
-            self.move(new_pos)
-            
-            print(f"✅ 窗口位置已调整: ({current_pos.x()},{current_pos.y()}) → ({new_x},{new_y})")
-            
-        except Exception as e:
-            print(f"❌ 窗口位置调整错误: {e}")
+            print(f"❌ 处理输入法位置调整错误: {e}")
 
     def _add_project_info_section(self, layout):
         """添加项目基础信息部分 - 增强版样式，使用实际项目数据"""
