@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 #  Interactive Feedback MCP - V8.1 深度智能分析规则
 
