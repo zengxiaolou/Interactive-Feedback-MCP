@@ -601,12 +601,33 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         for label, value in project_info:
             row = QHBoxLayout()
-            label_widget = QLabel(label)
-            label_widget.setStyleSheet("color: #ccc; font-size: 11px;")
-            label_widget.setFixedWidth(50)
             
+            # 🎨 增强label样式 - 更明显的视觉区分
+            label_widget = QLabel(label)
+            label_widget.setStyleSheet("""
+                color: #81C784; 
+                font-size: 10px; 
+                font-weight: bold;
+                background-color: rgba(129, 199, 132, 0.1);
+                padding: 2px 4px;
+                border-radius: 3px;
+                min-width: 40px;
+                max-width: 50px;
+            """)
+            label_widget.setFixedWidth(50)
+            label_widget.setAlignment(Qt.AlignCenter)
+            
+            # 🎯 增强value样式 - 清晰的内容显示
             value_widget = QLabel(value)
-            value_widget.setStyleSheet("color: #fff; font-size: 11px;")
+            value_widget.setStyleSheet("""
+                color: #FFFFFF; 
+                font-size: 11px; 
+                font-weight: 500;
+                background-color: rgba(255, 255, 255, 0.05);
+                padding: 2px 6px;
+                border-radius: 3px;
+                border-left: 2px solid #81C784;
+            """)
             value_widget.setWordWrap(True)
             
             row.addWidget(label_widget)
@@ -689,13 +710,32 @@ class ThreeColumnFeedbackUI(QMainWindow):
         for label, value in git_info:
             row_layout = QVBoxLayout() if label == "最后提交:" else QHBoxLayout()
             
+            # 🎨 增强label样式 - Git信息专用配色
             label_widget = QLabel(label)
-            label_widget.setStyleSheet("color: #ccc; font-size: 11px;")
+            label_widget.setStyleSheet("""
+                color: #64B5F6; 
+                font-size: 10px; 
+                font-weight: bold;
+                background-color: rgba(100, 181, 246, 0.1);
+                padding: 2px 4px;
+                border-radius: 3px;
+                min-width: 40px;
+            """)
             if isinstance(row_layout, QHBoxLayout):
                 label_widget.setFixedWidth(50)
+                label_widget.setAlignment(Qt.AlignCenter)
             
+            # 🎯 增强value样式 - Git信息专用样式
             value_widget = QLabel(value)
-            value_widget.setStyleSheet("color: #fff; font-size: 11px;")
+            value_widget.setStyleSheet("""
+                color: #FFFFFF; 
+                font-size: 11px; 
+                font-weight: 500;
+                background-color: rgba(255, 255, 255, 0.05);
+                padding: 2px 6px;
+                border-radius: 3px;
+                border-left: 2px solid #64B5F6;
+            """)
             if label == "最后提交:":
                 value_widget.setWordWrap(True)
                 value_widget.setMaximumHeight(40)
@@ -787,12 +827,33 @@ class ThreeColumnFeedbackUI(QMainWindow):
         
         for label, value in activity_info:
             row = QHBoxLayout()
-            label_widget = QLabel(label)
-            label_widget.setStyleSheet("color: #ccc; font-size: 11px;")
-            label_widget.setFixedWidth(60)
             
+            # 🎨 增强label样式 - 活动信息专用配色
+            label_widget = QLabel(label)
+            label_widget.setStyleSheet("""
+                color: #FFB74D; 
+                font-size: 10px; 
+                font-weight: bold;
+                background-color: rgba(255, 183, 77, 0.1);
+                padding: 2px 4px;
+                border-radius: 3px;
+                min-width: 50px;
+                max-width: 60px;
+            """)
+            label_widget.setFixedWidth(60)
+            label_widget.setAlignment(Qt.AlignCenter)
+            
+            # 🎯 增强value样式 - 活动信息专用样式
             value_widget = QLabel(value)
-            value_widget.setStyleSheet("color: #fff; font-size: 11px;")
+            value_widget.setStyleSheet("""
+                color: #FFFFFF; 
+                font-size: 11px; 
+                font-weight: 500;
+                background-color: rgba(255, 255, 255, 0.05);
+                padding: 2px 6px;
+                border-radius: 3px;
+                border-left: 2px solid #FFB74D;
+            """)
             value_widget.setWordWrap(True)
             
             row.addWidget(label_widget)
