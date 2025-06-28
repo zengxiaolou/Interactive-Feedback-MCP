@@ -79,7 +79,7 @@ class EnhancedMarkdownRenderer:
             return ""
         
         # 检查缓存
-        text_hash = hashlib.md5(text.encode()).hexdigest()
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
         if text_hash in self.cache:
             return self.cache[text_hash]
         
@@ -100,17 +100,16 @@ class EnhancedMarkdownRenderer:
     def _render_with_markdown(self, text: str) -> str:
         """使用python-markdown渲染"""
         try:
-            # 简化编码处理 - 避免重复编码
+            # 🔧 增强emoji编码处理
             if isinstance(text, bytes):
                 try:
                     text = text.decode('utf-8')
                 except UnicodeDecodeError:
-                    # 使用更安全的错误处理
                     text = text.decode('utf-8', errors='ignore')
             elif not isinstance(text, str):
                 text = str(text)
             
-            # 清理乱码字符
+            # 清理乱码字符（但严格保留emoji）
             text = self._clean_garbled_text(text)
             
             # 清理标题中的非常规字符
@@ -122,19 +121,20 @@ class EnhancedMarkdownRenderer:
             # 渲染markdown
             html_content = self.md.convert(text)
             
-            # 简化HTML内容处理 - 避免重复编码
+            # 🎯 确保HTML编码正确处理emoji
             if isinstance(html_content, bytes):
                 try:
                     html_content = html_content.decode('utf-8')
                 except UnicodeDecodeError:
                     html_content = html_content.decode('utf-8', errors='ignore')
             
-            # 包装在完整的HTML中
+            # 包装在完整的HTML中 - 增强emoji支持
             full_html = f"""
             <html>
             <head>
                 <meta charset="utf-8">
                 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
                     {self._get_custom_css()}
                     {self.pygments_css}
@@ -189,13 +189,18 @@ class EnhancedMarkdownRenderer:
         """获取自定义CSS样式 - 重要内容突出显示增强版"""
         return """
         body {
-            font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
             background: transparent;
             color: #ffffff;
             line-height: 1.6;
             margin: 0;
             padding: 16px;
             font-size: 14px;
+            /* 🎨 确保emoji正确渲染 */
+            font-variant-emoji: normal;
+            text-rendering: optimizeLegibility;
+            -webkit-font-feature-settings: "liga", "kern";
+            font-feature-settings: "liga", "kern";
         }
         
         /* 🎨 增强标题样式 - 重要内容突出 */
@@ -642,13 +647,13 @@ class EnhancedTextBrowser(QTextBrowser):
         self.setOpenLinks(True)  # 启用链接打开功能
         self.anchorClicked.connect(self._handle_link_click)
         
-        # 设置基础样式，包含中文字体
+        # 设置基础样式，包含中文字体和emoji支持
         self.setStyleSheet("""
             QTextBrowser {
                 background: transparent;
                 border: none;
                 selection-background-color: rgba(33, 150, 243, 0.3);
-                font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
             }
         """)
     
