@@ -7,6 +7,7 @@ import sys
 import subprocess
 import time
 from typing import Optional, List, TypedDict
+import re
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -938,27 +939,25 @@ class ThreeColumnFeedbackUI(QMainWindow):
             return f"{cleaned_name} (MCP Server)"
     
     def _clean_project_name(self, name: str) -> str:
-        """清理项目名称中的特殊字符，避免乱码"""
-        import re
-        
-        if not name or name == 'unknown':
-            return 'unknown'
-        
+        """清理项目名称中的特殊字符和乱码"""
         try:
-            # 确保是字符串类型
+            if not name:
+                return 'unknown'
+            
+            # 如果是None或其他类型，先转换为字符串
+            if name is None:
+                return 'unknown'
+            
             if not isinstance(name, str):
                 name = str(name)
             
-            # 安全的UTF-8解码处理
+            # 简化UTF-8处理 - 避免重复编码
             if isinstance(name, bytes):
                 try:
                     name = name.decode('utf-8')
                 except UnicodeDecodeError:
+                    # 使用更安全的错误处理
                     name = name.decode('utf-8', errors='ignore')
-            
-            # 确保文本是有效的字符串类型
-            if not isinstance(name, str):
-                name = str(name)
             
             # 移除控制字符和乱码符号
             name = re.sub(r'[\x00-\x1f\x7f-\x9f\ufffd◇◆]', '', name)

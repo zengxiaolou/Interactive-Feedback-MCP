@@ -100,17 +100,14 @@ class EnhancedMarkdownRenderer:
     def _render_with_markdown(self, text: str) -> str:
         """使用python-markdown渲染"""
         try:
-            # 强化编码处理
+            # 简化编码处理 - 避免重复编码
             if isinstance(text, bytes):
                 try:
                     text = text.decode('utf-8')
                 except UnicodeDecodeError:
+                    # 使用更安全的错误处理
                     text = text.decode('utf-8', errors='ignore')
             elif not isinstance(text, str):
-                text = str(text)
-            
-            # 确保文本是有效的字符串类型
-            if not isinstance(text, str):
                 text = str(text)
             
             # 清理乱码字符
@@ -125,7 +122,7 @@ class EnhancedMarkdownRenderer:
             # 渲染markdown
             html_content = self.md.convert(text)
             
-            # 确保HTML内容也是正确编码
+            # 简化HTML内容处理 - 避免重复编码
             if isinstance(html_content, bytes):
                 try:
                     html_content = html_content.decode('utf-8')
@@ -157,17 +154,13 @@ class EnhancedMarkdownRenderer:
     
     def _render_basic(self, text: str) -> str:
         """基础渲染（回退方案）"""
-        # 强化编码处理
+        # 简化编码处理 - 避免重复编码
         if isinstance(text, bytes):
             try:
                 text = text.decode('utf-8')
             except UnicodeDecodeError:
                 text = text.decode('utf-8', errors='ignore')
         elif not isinstance(text, str):
-            text = str(text)
-        
-        # 确保文本是有效的字符串类型
-        if not isinstance(text, str):
             text = str(text)
         
         # 清理乱码字符
