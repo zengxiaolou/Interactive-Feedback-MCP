@@ -160,6 +160,8 @@ class FeedbackUI(QMainWindow):
         """创建文本输入区域"""
         self.feedback_text = FeedbackTextEdit()
         self.feedback_text.image_pasted.connect(self._on_image_pasted)
+        # 连接提交请求信号
+        self.feedback_text.submit_requested.connect(self._submit_feedback)
         self.feedback_text.setStyleSheet(GlassmorphismStyles.text_edit())
         
         # 设置文档边距
@@ -235,6 +237,26 @@ class FeedbackUI(QMainWindow):
         reset_font = QShortcut(QKeySequence("Ctrl+0"), self)
         reset_font.activated.connect(self.reset_font_size)
 
+        # 提交快捷键 - 多种变体确保兼容性
+        def submit_with_debug():
+            print("🌍 全局快捷键触发提交 (备用方案)")
+            self._submit_feedback()
+        
+        # 主要提交快捷键
+        submit_shortcut1 = QShortcut(QKeySequence("Ctrl+Return"), self)
+        submit_shortcut1.activated.connect(submit_with_debug)
+        
+        # 备用提交快捷键  
+        submit_shortcut2 = QShortcut(QKeySequence("Ctrl+Enter"), self)
+        submit_shortcut2.activated.connect(submit_with_debug)
+        
+        # macOS兼容快捷键
+        if sys.platform == "darwin":
+            submit_shortcut3 = QShortcut(QKeySequence("Cmd+Return"), self)
+            submit_shortcut3.activated.connect(submit_with_debug)
+            submit_shortcut4 = QShortcut(QKeySequence("Cmd+Enter"), self)
+            submit_shortcut4.activated.connect(submit_with_debug)
+
         # 行高切换快捷键
         if sys.platform == "darwin":
             key_sequence = "Ctrl+Shift+L"
@@ -243,6 +265,9 @@ class FeedbackUI(QMainWindow):
 
         toggle_line_height_shortcut = QShortcut(QKeySequence(key_sequence), self)
         toggle_line_height_shortcut.activated.connect(self._toggle_line_height)
+        
+        print("✅ 快捷键设置完成 - 已添加多重Ctrl+Enter提交功能")
+        print("   📋 支持快捷键: Ctrl+Return, Ctrl+Enter" + (", Cmd+Return, Cmd+Enter" if sys.platform == "darwin" else ""))
 
     def _update_description_text(self):
         """更新描述文本内容"""
@@ -348,6 +373,8 @@ class FeedbackUI(QMainWindow):
 
     def _submit_feedback(self):
         """提交反馈"""
+        print("🚀 开始处理反馈提交...")
+        
         feedback_text = self.feedback_text.toPlainText().strip()
         selected_options = []
 
@@ -364,16 +391,23 @@ class FeedbackUI(QMainWindow):
         final_feedback_parts = []
         if selected_options:
             final_feedback_parts.append("; ".join(selected_options))
+            print(f"📋 已选择选项: {len(selected_options)}个")
         if feedback_text:
             final_feedback_parts.append(feedback_text)
+            print(f"📝 文本内容长度: {len(feedback_text)}字符")
 
         final_feedback = "\n\n".join(final_feedback_parts)
         images_b64 = [img['base64'] for img in image_data]
+        
+        if image_data:
+            print(f"🖼️ 包含图片: {len(image_data)}张")
 
         self.feedback_result = FeedbackResult(
             interactive_feedback=final_feedback,
             images=images_b64
         )
+        
+        print("✅ 反馈数据准备完成，关闭窗口...")
         self.close()
 
     def closeEvent(self, event):

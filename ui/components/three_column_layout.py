@@ -306,6 +306,25 @@ class ThreeColumnFeedbackUI(QMainWindow):
         # 🎯 连接输入法位置调整信号
         self.custom_input.ime_position_adjusted.connect(self._on_ime_position_adjusted)
         
+        # 🚀 【关键修复】连接提交信号到提交方法
+        try:
+            self.custom_input.submit_requested.connect(self._submit_feedback)
+            print("🔗 信号连接完成: FeedbackTextEdit.submit_requested -> ThreeColumnFeedbackUI._submit_feedback")
+            
+            # 验证连接状态 - 简化验证，避免API错误
+            print(f"✅ 信号连接验证: submit_requested 信号已连接")
+            
+            # 测试连接是否正常工作
+            if hasattr(self.custom_input.submit_requested, 'emit'):
+                print("📡 信号发射器可用")
+            else:
+                print("❌ 信号发射器不可用")
+                
+        except Exception as e:
+            print(f"❌ 信号连接失败: {e}")
+            import traceback
+            traceback.print_exc()
+        
         layout.addWidget(self.custom_input)
         
         # 按钮区域 - 使用增强版样式
@@ -1381,9 +1400,14 @@ class ThreeColumnFeedbackUI(QMainWindow):
 
     def _submit_feedback(self):
         """提交反馈"""
+        print("🎯 _submit_feedback() 方法被调用！！！")
+        print(f"🕐 调用时间: {time.time()}")
+        print(f"📍 调用源: 通过信号槽机制触发")
+        
         start_time = global_response_tracker.start_timing()
         
         feedback_text = self.custom_input.toPlainText().strip()
+        print(f"📝 输入框内容: '{feedback_text}'")
         selected_options = []
 
         # 获取选中的预定义选项

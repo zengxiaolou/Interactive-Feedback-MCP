@@ -18,14 +18,15 @@ class FeedbackTextEdit(QTextEdit):
     DEFAULT_MAX_IMAGE_HEIGHT = 1624
     DEFAULT_IMAGE_FORMAT = "PNG"
     
-    # 输入法位置调整常量
-    IME_OFFSET_Y = 25           # 输入法框向下偏移像素
+    # 输入法位置调整常量 - 优化后的偏移量
+    IME_OFFSET_Y = 15           # 输入法框向下偏移像素 (从25调整为15)
     IME_SAFETY_MARGIN = 10      # 安全边距
     IME_UPDATE_DELAY = 10       # 位置更新延迟(ms)
 
     # 定义类级别的信号
     image_pasted = Signal(QPixmap)
     ime_position_adjusted = Signal(QRect)  # 输入法位置调整信号
+    submit_requested = Signal()  # 新增：提交请求信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -36,12 +37,16 @@ class FeedbackTextEdit(QTextEdit):
         self.original_cursor_rect = QRect()
         self.adjusted_ime_rect = QRect()
         
+        # 图片数据存储
+        self._images_list = []
+        self._image_data = []
+        
         # 设置定时器用于延迟更新输入法位置
         self.ime_update_timer = QTimer()
         self.ime_update_timer.setSingleShot(True)
         self.ime_update_timer.timeout.connect(self._update_ime_position)
         
-        print("🎯 FeedbackTextEdit初始化完成 - 输入法位置智能调整模式")
+        print("🎯 FeedbackTextEdit初始化完成 - 输入法位置智能调整模式 (优化偏移量: 15px)")
 
     def inputMethodEvent(self, event: QInputMethodEvent):
         """处理输入法事件，实现候选词位置智能调整"""
@@ -231,6 +236,20 @@ class FeedbackTextEdit(QTextEdit):
             if image and not image.isNull():
                 pixmap = QPixmap.fromImage(image)
                 if not pixmap.isNull():
+                    # 存储图片数据
+                    image_id = str(uuid.uuid4())
+                    image_uri = self.get_image_data_uri(pixmap)
+                    image_info = {
+                        'id': image_id,
+                        'base64': image_uri.split(',')[1] if ',' in image_uri else image_uri,
+                        'width': pixmap.width(),
+                        'height': pixmap.height(),
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    self._image_data.append(image_info)
+                    self._images_list.append(image_uri)
+                    
+                    print(f"📷 图片已存储: {image_id}, 大小: {pixmap.width()}x{pixmap.height()}")
                     self.image_pasted.emit(pixmap)
                     return
         
@@ -239,13 +258,77 @@ class FeedbackTextEdit(QTextEdit):
 
     def keyPressEvent(self, event: QKeyEvent):
         """处理按键事件"""
+        # 检查焦点状态
+        has_focus = self.hasFocus()
+        is_enabled = self.isEnabled()
+        is_visible = self.isVisible()
+        print(f"🔍 组件状态检查: Focus={has_focus}, Enabled={is_enabled}, Visible={is_visible}")
+        
+        # 详细的按键调试信息
+        key_name = event.text() if event.text() else f"Key_{event.key()}"
+        modifiers = []
+        
+        # 改进的修饰键检测，支持macOS
+        mod_flags = event.modifiers()
+        if mod_flags & Qt.ControlModifier:
+            modifiers.append("Ctrl")
+        if mod_flags & Qt.MetaModifier:  # macOS上的Cmd键
+            modifiers.append("Cmd")
+        if mod_flags & Qt.ShiftModifier:
+            modifiers.append("Shift")
+        if mod_flags & Qt.AltModifier:
+            modifiers.append("Alt")
+        
+        modifier_text = "+".join(modifiers) if modifiers else "None"
+        print(f"🎹 按键检测: Key={event.key()}, Text='{event.text()}', Modifiers={modifier_text}")
+        
+        # 检测Enter/Return键
+        is_return_enter = event.key() in (Qt.Key_Return, Qt.Key_Enter)
+        
+        if is_return_enter:
+            # 检测修饰键状态
+            has_shift = bool(mod_flags & Qt.ShiftModifier)
+            has_ctrl_or_cmd = bool(mod_flags & (Qt.ControlModifier | Qt.MetaModifier))
+            
+            if has_shift:
+                # Shift+Enter: 换行（默认行为）
+                print("↩️ Shift+Enter检测 - 执行换行")
+                super().keyPressEvent(event)
+                return
+            elif has_ctrl_or_cmd:
+                # Ctrl+Enter 或 Cmd+Enter: 提交
+                cmd_key = "Cmd" if mod_flags & Qt.MetaModifier else "Ctrl"
+                print(f"⌨️ {cmd_key}+Enter快捷键触发提交 ✅")
+                self.submit_requested.emit()
+                event.accept()
+                return
+            else:
+                # 单独的Enter: 提交 (three_column_layout的默认行为)
+                print("⌨️ Enter键触发提交 ✅")
+                print(f"📡 即将发射submit_requested信号...")
+                
+                # 发射信号 - 简化调试，避免API错误
+                try:
+                    self.submit_requested.emit()
+                    print(f"✅ submit_requested信号已发射！")
+                except Exception as e:
+                    print(f"❌ 信号发射失败: {e}")
+                    import traceback
+                    traceback.print_exc()
+                
+                print(f"🔗 信号发射操作完成")
+                event.accept()
+                return
+        
         # 检测Esc键来取消输入法
         if event.key() == Qt.Key_Escape and self.ime_active:
             self.ime_active = False
             self._reset_ime_position()
             print("⌨️ Esc键取消输入法")
+            event.accept()
             return
             
+        # 处理其他按键
         super().keyPressEvent(event)
 
     def get_image_data_uri(self, pixmap: QPixmap, max_width: int = None, max_height: int = None, 
@@ -274,6 +357,16 @@ class FeedbackTextEdit(QTextEdit):
         
         return f"data:{mime_type};base64,{image_base64}"
 
+    def get_image_data(self) -> List[Dict[str, Any]]:
+        """获取当前存储的图片数据（与main_window兼容）"""
+        return self._image_data.copy()
+
     def get_images_list(self) -> List[str]:
         """获取当前存储的图片列表"""
-        return getattr(self, '_images_list', []) 
+        return self._images_list.copy()
+        
+    def clear_images(self):
+        """清空图片存储"""
+        self._images_list.clear()
+        self._image_data.clear()
+        print("🗑️ 图片存储已清空") 
