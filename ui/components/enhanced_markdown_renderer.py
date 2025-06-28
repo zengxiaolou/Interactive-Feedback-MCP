@@ -186,7 +186,7 @@ class EnhancedMarkdownRenderer:
         """
     
     def _get_custom_css(self) -> str:
-        """获取自定义CSS样式"""
+        """获取自定义CSS样式 - 重要内容突出显示增强版"""
         return """
         body {
             font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -198,174 +198,374 @@ class EnhancedMarkdownRenderer:
             font-size: 14px;
         }
         
-        /* 标题样式 */
+        /* 🎨 增强标题样式 - 重要内容突出 */
         h1, h2, h3, h4, h5, h6 {
-            color: #2196F3;
+            color: #64B5F6;
             margin-top: 24px;
             margin-bottom: 16px;
-            font-weight: 600;
+            font-weight: 700;
+            position: relative;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, rgba(100, 181, 246, 0.15), rgba(33, 150, 243, 0.08));
+            border-radius: 8px;
+            border-left: 4px solid #64B5F6;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(100, 181, 246, 0.2);
         }
         
-        h1 { font-size: 24px; border-bottom: 2px solid rgba(33, 150, 243, 0.3); padding-bottom: 8px; }
-        h2 { font-size: 20px; border-bottom: 1px solid rgba(33, 150, 243, 0.2); padding-bottom: 6px; }
-        h3 { font-size: 18px; }
-        h4 { font-size: 16px; }
-        h5 { font-size: 14px; }
-        h6 { font-size: 13px; }
+        h1 { 
+            font-size: 22px; 
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1));
+            border-left: 4px solid #4CAF50;
+            color: #81C784;
+            box-shadow: 0 3px 12px rgba(76, 175, 80, 0.3);
+        }
+        h2 { 
+            font-size: 19px; 
+            background: linear-gradient(135deg, rgba(33, 150, 243, 0.18), rgba(33, 150, 243, 0.08));
+            border-left: 4px solid #2196F3;
+            color: #64B5F6;
+        }
+        h3 { 
+            font-size: 17px; 
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 152, 0, 0.08));
+            border-left: 4px solid #FF9800;
+            color: #FFB74D;
+        }
+        h4 { 
+            font-size: 15px; 
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.15), rgba(156, 39, 176, 0.08));
+            border-left: 4px solid #9C27B0;
+            color: #BA68C8;
+        }
+        h5 { font-size: 14px; padding: 8px 16px; }
+        h6 { font-size: 13px; padding: 6px 12px; }
         
-        /* 段落样式 */
+        /* 🔥 超强调重要段落 - 开头带特定emoji的段落 */
+        p:has-text(🎯), p:has-text(⚠️), p:has-text(🚨), p:has-text(💡), p:has-text(✅), p:has-text(❌) {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.05));
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            position: relative;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 12px rgba(255, 193, 7, 0.2);
+        }
+        
+        /* 段落样式增强 */
         p {
             margin: 12px 0;
             text-align: justify;
         }
         
-        /* 代码块样式 */
+        /* 🎨 强调文本样式 */
+        strong, b {
+            color: #FFD54F;
+            font-weight: 700;
+            background: linear-gradient(135deg, rgba(255, 213, 79, 0.2), rgba(255, 213, 79, 0.1));
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-shadow: 0 0 8px rgba(255, 213, 79, 0.3);
+        }
+        
+        em, i {
+            color: #81C784;
+            font-style: italic;
+            background: linear-gradient(135deg, rgba(129, 199, 132, 0.15), rgba(129, 199, 132, 0.05));
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        
+        /* 🎯 特殊标记增强 */
+        p:contains('🎯') {
+            background: linear-gradient(135deg, rgba(33, 150, 243, 0.2), rgba(33, 150, 243, 0.1)) !important;
+            border-left: 4px solid #2196F3 !important;
+            border-radius: 0 8px 8px 0 !important;
+            padding: 16px 20px !important;
+            font-weight: 500;
+            box-shadow: 0 4px 16px rgba(33, 150, 243, 0.25) !important;
+        }
+        
+        p:contains('⚠️'), p:contains('🚨') {
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(255, 152, 0, 0.1)) !important;
+            border-left: 4px solid #FF9800 !important;
+            border-radius: 0 8px 8px 0 !important;
+            padding: 16px 20px !important;
+            color: #FFE0B2;
+            box-shadow: 0 4px 16px rgba(255, 152, 0, 0.25) !important;
+        }
+        
+        p:contains('✅') {
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1)) !important;
+            border-left: 4px solid #4CAF50 !important;
+            border-radius: 0 8px 8px 0 !important;
+            padding: 16px 20px !important;
+            color: #C8E6C9;
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.25) !important;
+        }
+        
+        p:contains('❌') {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.2), rgba(244, 67, 54, 0.1)) !important;
+            border-left: 4px solid #F44336 !important;
+            border-radius: 0 8px 8px 0 !important;
+            padding: 16px 20px !important;
+            color: #FFCDD2;
+            box-shadow: 0 4px 16px rgba(244, 67, 54, 0.25) !important;
+        }
+        
+        p:contains('💡') {
+            background: linear-gradient(135deg, rgba(255, 235, 59, 0.2), rgba(255, 235, 59, 0.1)) !important;
+            border-left: 4px solid #FFEB3B !important;
+            border-radius: 0 8px 8px 0 !important;
+            padding: 16px 20px !important;
+            color: #FFF9C4;
+            box-shadow: 0 4px 16px rgba(255, 235, 59, 0.25) !important;
+        }
+        
+        /* 🔥 代码块样式增强 */
         .highlight {
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0;
-            border-left: 4px solid #2196F3;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 6px solid #64B5F6;
+            border-top: 2px solid rgba(100, 181, 246, 0.3);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(100, 181, 246, 0.2);
             overflow-x: auto;
+            position: relative;
+        }
+        
+        .highlight::before {
+            content: "💻 代码";
+            position: absolute;
+            top: -8px;
+            left: 16px;
+            background: linear-gradient(135deg, #64B5F6, #2196F3);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
         }
         
         .highlight pre {
             margin: 0;
             font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
             font-size: 13px;
-            line-height: 1.5;
+            line-height: 1.6;
             color: #f8f8f2;
         }
         
-        /* 行内代码 */
+        /* 🎨 行内代码增强 */
         code {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 2px 6px;
-            border-radius: 4px;
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 107, 107, 0.1));
+            padding: 3px 8px;
+            border-radius: 6px;
             font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
             font-size: 13px;
-            color: #ff6b6b;
+            color: #FF8A80;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(255, 107, 107, 0.15);
         }
         
-        /* 表格样式 */
+        /* 📊 表格样式超级增强 */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 16px 0;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
+            margin: 20px 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+            border-radius: 12px;
             overflow: hidden;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(100, 181, 246, 0.2);
         }
         
         th, td {
-            padding: 12px 16px;
+            padding: 16px 20px;
             text-align: left;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         th {
-            background: rgba(33, 150, 243, 0.2);
-            font-weight: 600;
-            color: #2196F3;
-            font-size: 13px;
+            background: linear-gradient(135deg, rgba(100, 181, 246, 0.3), rgba(33, 150, 243, 0.2));
+            font-weight: 700;
+            color: #E3F2FD;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid rgba(100, 181, 246, 0.4);
         }
         
         tr:hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(100, 181, 246, 0.1);
+            transition: background 0.3s ease;
         }
         
-        /* 引用块样式 */
+        tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        
+        /* 🔮 引用块超级增强 */
         blockquote {
-            margin: 16px 0;
-            padding: 16px 20px;
-            background: rgba(156, 39, 176, 0.1);
-            border-left: 4px solid #9C27B0;
-            border-radius: 0 8px 8px 0;
-            backdrop-filter: blur(10px);
+            margin: 20px 0;
+            padding: 20px 24px;
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.15), rgba(156, 39, 176, 0.08));
+            border-left: 6px solid #BA68C8;
+            border-radius: 0 12px 12px 0;
+            backdrop-filter: blur(15px);
             position: relative;
             font-style: italic;
+            box-shadow: 0 6px 20px rgba(156, 39, 176, 0.2);
+            border-top: 2px solid rgba(186, 104, 200, 0.3);
+        }
+        
+        blockquote::before {
+            content: "💬 引用";
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            background: linear-gradient(135deg, #BA68C8, #9C27B0);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            font-style: normal;
         }
         
         blockquote p {
             margin: 0;
+            color: #F3E5F5;
+            font-weight: 500;
         }
         
-        /* 列表样式 */
+        /* 📋 列表样式增强 */
         ul, ol {
-            margin: 12px 0;
-            padding-left: 24px;
+            margin: 16px 0;
+            padding-left: 28px;
         }
         
         li {
-            margin: 6px 0;
+            margin: 8px 0;
+            padding-left: 8px;
+            position: relative;
         }
         
-        /* 链接样式 */
-        a {
+        ul li::before {
+            content: "▸";
             color: #64B5F6;
+            font-weight: bold;
+            position: absolute;
+            left: -16px;
+            font-size: 16px;
+        }
+        
+        /* 🔗 链接样式增强 */
+        a {
+            color: #81C784;
             text-decoration: none;
-            border-bottom: 1px solid rgba(100, 181, 246, 0.3);
-            transition: all 0.2s ease;
+            border-bottom: 2px solid rgba(129, 199, 132, 0.4);
+            transition: all 0.3s ease;
+            padding: 2px 4px;
+            border-radius: 4px;
+            background: linear-gradient(135deg, rgba(129, 199, 132, 0.1), rgba(129, 199, 132, 0.05));
         }
         
         a:hover {
-            color: #2196F3;
-            border-bottom-color: #2196F3;
+            color: #A5D6A7;
+            border-bottom-color: #A5D6A7;
+            background: linear-gradient(135deg, rgba(165, 214, 167, 0.2), rgba(165, 214, 167, 0.1));
+            box-shadow: 0 2px 8px rgba(129, 199, 132, 0.3);
         }
         
-        /* 警告框样式 */
+        /* 🚨 警告框样式超级增强 */
         .admonition {
-            margin: 16px 0;
-            padding: 16px;
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(15px);
+            position: relative;
+            border-top: 3px solid;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }
         
         .admonition.note {
-            background: rgba(33, 150, 243, 0.1);
-            border-left: 4px solid #2196F3;
+            background: linear-gradient(135deg, rgba(33, 150, 243, 0.15), rgba(33, 150, 243, 0.08));
+            border-left: 6px solid #2196F3;
+            border-top-color: #64B5F6;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.25);
         }
         
         .admonition.warning {
-            background: rgba(255, 152, 0, 0.1);
-            border-left: 4px solid #FF9800;
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 152, 0, 0.08));
+            border-left: 6px solid #FF9800;
+            border-top-color: #FFB74D;
+            box-shadow: 0 6px 20px rgba(255, 152, 0, 0.25);
         }
         
         .admonition.danger {
-            background: rgba(244, 67, 54, 0.1);
-            border-left: 4px solid #F44336;
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), rgba(244, 67, 54, 0.08));
+            border-left: 6px solid #F44336;
+            border-top-color: #EF5350;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.25);
         }
         
         .admonition-title {
-            font-weight: bold;
-            margin-bottom: 8px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
-        /* 分隔线 */
+        /* ➖ 分隔线增强 */
         hr {
             border: none;
-            height: 1px;
-            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
-            margin: 24px 0;
+            height: 2px;
+            background: linear-gradient(to right, transparent, rgba(100, 181, 246, 0.6), transparent);
+            margin: 32px 0;
+            border-radius: 1px;
         }
         
-        /* 脚注 */
+        /* 📝 脚注样式 */
         .footnote {
             font-size: 12px;
             color: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 16px;
         }
         
-        /* 任务列表 */
+        /* ☑️ 任务列表增强 */
         .task-list-item {
             list-style: none;
+            position: relative;
+            padding-left: 32px;
         }
         
         .task-list-item input[type="checkbox"] {
-            margin-right: 8px;
+            position: absolute;
+            left: 0;
+            top: 2px;
+            width: 16px;
+            height: 16px;
+            accent-color: #4CAF50;
+        }
+        
+        /* 📊 特殊内容容器 */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.1));
+            border: 2px solid rgba(255, 193, 7, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.3);
         }
         """
 
