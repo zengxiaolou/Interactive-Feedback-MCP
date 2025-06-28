@@ -102,12 +102,16 @@ class EnhancedMarkdownRenderer:
         try:
             # 强化编码处理
             if isinstance(text, bytes):
-                text = text.decode('utf-8', errors='replace')
+                try:
+                    text = text.decode('utf-8')
+                except UnicodeDecodeError:
+                    text = text.decode('utf-8', errors='ignore')
             elif not isinstance(text, str):
                 text = str(text)
             
-            # 确保文本是有效的UTF-8
-            text = text.encode('utf-8', errors='replace').decode('utf-8')
+            # 确保文本是有效的字符串类型
+            if not isinstance(text, str):
+                text = str(text)
             
             # 清理乱码字符
             text = self._clean_garbled_text(text)
@@ -123,7 +127,10 @@ class EnhancedMarkdownRenderer:
             
             # 确保HTML内容也是正确编码
             if isinstance(html_content, bytes):
-                html_content = html_content.decode('utf-8', errors='replace')
+                try:
+                    html_content = html_content.decode('utf-8')
+                except UnicodeDecodeError:
+                    html_content = html_content.decode('utf-8', errors='ignore')
             
             # 包装在完整的HTML中
             full_html = f"""
@@ -152,12 +159,16 @@ class EnhancedMarkdownRenderer:
         """基础渲染（回退方案）"""
         # 强化编码处理
         if isinstance(text, bytes):
-            text = text.decode('utf-8', errors='replace')
+            try:
+                text = text.decode('utf-8')
+            except UnicodeDecodeError:
+                text = text.decode('utf-8', errors='ignore')
         elif not isinstance(text, str):
             text = str(text)
         
-        # 确保文本是有效的UTF-8
-        text = text.encode('utf-8', errors='replace').decode('utf-8')
+        # 确保文本是有效的字符串类型
+        if not isinstance(text, str):
+            text = str(text)
         
         # 清理乱码字符
         text = self._clean_garbled_text(text)
@@ -369,15 +380,21 @@ class EnhancedMarkdownRenderer:
         """清理乱码字符，但保留所有有效Unicode字符"""
         import re
         
-        # 只清理真正的乱码字符，保留所有正常Unicode字符
+        # 强化乱码字符清理，包含特定的乱码符号
         replacements = {
             # 替换字符（菱形问号）
             r'[�]+': '',
             r'[\ufffd]+': '',
+            # 特定的乱码符号（根据用户反馈的◇◇问题）
+            r'[◇◆]+': '',
+            r'[◇]+': '',
+            r'[◆]+': '',
             # 控制字符（但保留换行、制表符、回车）
-            r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]': '',
+            r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]': '',
             # 移除NULL字符
             r'\x00': '',
+            # 其他可能的特殊符号
+            r'[\u2666\u25c7\u25c6]+': '',  # Unicode菱形符号
         }
         
         cleaned_text = text

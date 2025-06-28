@@ -25,8 +25,17 @@ from ui.utils.logging_system import init_logging, get_logger, log_project_contex
 # 设置默认编码
 if sys.platform.startswith('win'):
     # Windows系统特殊处理
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+    try:
+        # 检查是否在Windows系统上
+        if sys.platform.startswith('win'):
+            # 尝试设置stdout和stderr的UTF-8编码
+            if hasattr(sys.stdout, 'detach'):
+                sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())  # type: ignore
+            if hasattr(sys.stderr, 'detach'):
+                sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())  # type: ignore
+    except (AttributeError, OSError, TypeError):
+        # 如果detach()不可用或失败，跳过编码设置
+        pass
 
 # 设置locale
 try:
@@ -138,8 +147,8 @@ def main():
         print(f"⚠️ 应用程序图标文件不存在: {icon_path}")
     
     # 设置应用程序属性
-    app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    app.setAttribute(Qt.AA_EnableHighDpiScaling, True)  # type: ignore
+    app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)  # type: ignore
     
     # 强制设置深色模式，不受系统主题影响
     app.setStyle('Fusion')  # 使用Fusion样式避免系统主题影响
@@ -147,19 +156,19 @@ def main():
     
     # 设置强制深色调色板
     dark_palette = QPalette()
-    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
-    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.ToolTipBase, QColor(0, 0, 0))
-    dark_palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))
-    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))  # type: ignore
+    dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))  # type: ignore
+    dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))  # type: ignore
+    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))  # type: ignore
+    dark_palette.setColor(QPalette.ToolTipBase, QColor(0, 0, 0))  # type: ignore
+    dark_palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))  # type: ignore
+    dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))  # type: ignore
+    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))  # type: ignore
+    dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))  # type: ignore
+    dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))  # type: ignore
+    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))  # type: ignore
+    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))  # type: ignore
+    dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))  # type: ignore
     
     app.setPalette(dark_palette)
     
@@ -189,13 +198,13 @@ def main():
         
         # 验证调色板是否正确应用
         current_palette = app.palette()
-        window_color = current_palette.color(QPalette.Window)
+        window_color = current_palette.color(QPalette.Window)  # type: ignore
         if window_color.red() > 128:  # 如果仍然是浅色
             print("⚠️ 检测到系统覆盖，重新应用深色调色板")
             app.setPalette(dark_palette)  # 重新应用
         
-        print(f"📊 最终Window背景色: {current_palette.color(QPalette.Window).name()}")
-        print(f"📊 最终Text文字色: {current_palette.color(QPalette.WindowText).name()}")
+        print(f"📊 最终Window背景色: {current_palette.color(QPalette.Window).name()}")  # type: ignore
+        print(f"📊 最终Text文字色: {current_palette.color(QPalette.WindowText).name()}")  # type: ignore
         
     except Exception as e:
         print(f"⚠️ 强化深色模式设置时出现警告: {e}")
@@ -205,8 +214,9 @@ def main():
     default_font = QFont()
     chinese_fonts = ['PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'STHeiti']
     for font_name in chinese_fonts:
+        test_font = QFont(font_name)
         default_font.setFamily(font_name)
-        if QFont(font_name).exactMatch():
+        if test_font.exactMatch():
             break
     else:
         default_font = app.font()
