@@ -12,9 +12,15 @@ venv*/
 
 # Logs
 *.log
+logs/
+session_*.json
+*_test.py
+test_*.py
+
+# Session monitoring data
+session_events.jsonl
+sessions_summary.jsonl
 
 #Others
 .DS_Store
 uv.lock
-
-.cursor/rules/
