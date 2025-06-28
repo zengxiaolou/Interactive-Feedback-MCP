@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 from PySide6.QtWidgets import QTextEdit, QApplication, QWidget
-from PySide6.QtCore import Qt, Signal, QBuffer, QIODevice, QRect, QPoint, QTimer
+from PySide6.QtCore import Qt, Signal, QBuffer, QIODevice, QRect, QPoint, QTimer, QByteArray
 from PySide6.QtGui import QKeyEvent, QPixmap, QInputMethodEvent, QTextCursor
 
 class FeedbackTextEdit(QTextEdit):
