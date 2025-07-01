@@ -9,10 +9,50 @@ import json
 import tempfile
 import subprocess
 import base64
+import argparse
+from datetime import datetime
 from typing import Annotated, Dict, Tuple, List, Optional
 
-from fastmcp import FastMCP, Image
+from fastmcp import FastMCP
+from fastmcp.utilities.types import Image
 from pydantic import Field
+
+# 解析命令行参数
+def parse_command_line_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description='Interactive Feedback MCP Server')
+    parser.add_argument('--caller-source',
+                       choices=['cursor', 'augment', 'claude', 'vscode', 'custom'],
+                       default=None,
+                       help='调用来源标识 (cursor|augment|claude|vscode|custom)')
+    parser.add_argument('--debug',
+                       action='store_true',
+                       help='启用调试模式')
+    parser.add_argument('--log-level',
+                       choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                       default=None,
+                       help='设置日志级别')
+
+    # 只解析已知参数，忽略其他参数（如 FastMCP 的参数）
+    args, unknown = parser.parse_known_args()
+    return args
+
+# 解析命令行参数
+cmd_args = parse_command_line_args()
+
+# 设置全局调用来源（优先级：命令行参数 > 环境变量 > 默认值）
+GLOBAL_CALLER_SOURCE = (
+    cmd_args.caller_source or
+    os.environ.get('MCP_FEEDBACK_CALLER_SOURCE', 'cursor')
+)
+
+# 设置调试模式
+if cmd_args.debug:
+    os.environ['MCP_FEEDBACK_DEBUG'] = 'true'
+
+# 设置日志级别
+if cmd_args.log_level:
+    os.environ['MCP_FEEDBACK_LOG_LEVEL'] = cmd_args.log_level
 
 # 导入日志系统
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,18 +60,27 @@ from ui.utils.logging_system import init_logging, get_logger, log_performance, l
 
 # 初始化日志系统
 logging_manager = init_logging({
-    'level': 'INFO',
+    'level': os.environ.get('MCP_FEEDBACK_LOG_LEVEL', 'INFO'),
     'console_enabled': True,
     'console_level': 'WARNING',  # 控制台只显示警告和错误
     'performance_enabled': True,
     'project_context_enabled': True
 })
 
-# The log_level is necessary for Cline to work: https://github.com/jlowin/fastmcp/issues/81
-mcp = FastMCP("Interactive Feedback MCP", log_level="ERROR")
+# FastMCP server initialization
+mcp = FastMCP("Interactive Feedback MCP")
 
 # 获取主日志记录器
 logger = get_logger('mcp_server')
+
+# 记录启动参数
+logger.info(f"MCP服务器启动 - 调用来源: {GLOBAL_CALLER_SOURCE}")
+if cmd_args.caller_source:
+    logger.info(f"通过命令行参数设置调用来源: {cmd_args.caller_source}")
+elif os.environ.get('MCP_FEEDBACK_CALLER_SOURCE'):
+    logger.info(f"通过环境变量设置调用来源: {os.environ.get('MCP_FEEDBACK_CALLER_SOURCE')}")
+else:
+    logger.info("使用默认调用来源: cursor")
 
 def _detect_caller_project_context():
     """检测调用方项目上下文信息"""
@@ -185,7 +234,9 @@ def launch_feedback_ui(
                         summary_length=len(summary), 
                         options_count=len(predefinedOptions) if predefinedOptions else 0):
         
-        logger.info(f"启动反馈UI: 优先级={priority}, 类别={category}")
+        # 使用全局调用源信息（已在启动时确定优先级）
+        caller_source = GLOBAL_CALLER_SOURCE
+        logger.info(f"启动反馈UI: 优先级={priority}, 类别={category}, 调用源={caller_source}")
         
         # Create a temporary file for the feedback result
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
@@ -222,6 +273,7 @@ def launch_feedback_ui(
             # 添加新的扩展参数
             env['MCP_FEEDBACK_PRIORITY'] = str(priority)
             env['MCP_FEEDBACK_CATEGORY'] = category
+            env['MCP_FEEDBACK_CALLER_SOURCE'] = caller_source
             
             # 添加额外的上下文数据
             if context_data:
@@ -316,25 +368,59 @@ def interactive_feedback(
     images_data = result_dict.get("images", [])
     img_b64_list: List[str] = images_data if isinstance(images_data, list) else []
 
-    # 把 base64 变成 Image 对象
-    images: List[Image] = []
-    for b64 in img_b64_list:
-        try:
-            img_bytes = base64.b64decode(b64)
-            images.append(Image(data=img_bytes, format="png"))
-        except Exception:
-            # 若解码失败，忽略该图片并在文字中提示
-            txt += f"\n\n[warning] 有一张图片解码失败。"
+    # 在回复中添加调用来源信息
+    caller_source_info = f"\n\n🔗 **调用来源**: {GLOBAL_CALLER_SOURCE.upper()}"
 
-    # 根据返回的实际内容组装 tuple
-    if txt and images:
-        return (txt, *images)
-    elif txt:
-        return (txt,)
-    elif images:
-        return (images[0],) if len(images) == 1 else tuple(images)
+    # 根据调用来源添加不同的标识符
+    caller_icons = {
+        'cursor': '🖱️',
+        'augment': '🚀',
+        'claude': '🤖',
+        'vscode': '💻',
+        'custom': '⚙️'
+    }
+
+    caller_icon = caller_icons.get(GLOBAL_CALLER_SOURCE, '❓')
+    caller_source_info = f"\n\n{caller_icon} **调用来源**: {GLOBAL_CALLER_SOURCE.upper()}"
+
+    # 添加时间戳
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    caller_source_info += f" | ⏰ {timestamp}"
+
+    # 将调用来源信息添加到回复文本中
+    if txt:
+        txt += caller_source_info
     else:
-        return ("",)
+        txt = f"✅ 反馈已收到{caller_source_info}"
+
+    # 根据调用来源处理图片
+    if GLOBAL_CALLER_SOURCE == "augment" and img_b64_list:
+        # Augment 调用：简化处理，只返回文本说明
+        txt += f"\n\n📷 检测到 {len(img_b64_list)} 张图片（Augment调用模式）"
+        logger.info(f"Augment调用: 检测到 {len(img_b64_list)} 张图片")
+        return txt
+    else:
+        # 其他调用方式（Cursor等）：返回 Image 对象
+        images: List[Image] = []
+        for b64 in img_b64_list:
+            try:
+                img_bytes = base64.b64decode(b64)
+                images.append(Image(data=img_bytes, format="png"))
+            except Exception:
+                # 若解码失败，忽略该图片并在文字中提示
+                txt += f"\n\n[warning] 有一张图片解码失败。"
+
+        # 根据返回的实际内容组装 tuple
+        if txt and images:
+            return (txt, *images)
+        elif txt:
+            return (txt,)
+        elif images:
+            return (images[0],) if len(images) == 1 else tuple(images)
+        else:
+            return (caller_source_info,)
+
+
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
